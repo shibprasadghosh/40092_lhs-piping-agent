@@ -8,11 +8,11 @@ from langchain_experimental.agents import create_pandas_dataframe_agent
 # পেজ কনফিগারেশন
 st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 
-# টাইটেল ও ওয়েলকাম মেসেজ
+# টাইটেল ও ওয়েলকাম মেসেজ
 st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Your smart assistant for all LHS line nos., areas, joints, spools, and welding data. Feel free to ask anything in any language!")
 
-# সাইডবার - প্রজেক্টের হাইলাইটস (ইংলিশে আপডেট করা)
+# সাইডবার - প্রজেক্টের হাইলাইটস
 st.sidebar.title("🛠️ Project LHS Info")
 st.sidebar.write("This chat assistant helps you to:")
 st.sidebar.info("- Check welding joint status")
@@ -30,8 +30,8 @@ def log_visitor(query_text):
 @st.cache_resource
 def load_agent():
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
-    df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", dtype=str)
-    llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0)
+    df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
     
     prefix = "You are a helpful assistant for LHS piping projects. Always provide concise and accurate data from the dataframe."
     agent = create_pandas_dataframe_agent(llm, df, verbose=True, allow_dangerous_code=True, handle_parsing_errors=True, prefix=prefix)
@@ -59,13 +59,12 @@ if st.button("Search Database"):
             try:
                 response = agent.invoke({"input": user_query + " You MUST start your final output exactly with the words 'Final Answer: '"})
                 st.success("Result found!")
-                # আউটপুট হ্যান্ডেলিং আরও স্মুথ করা হলো
+                # আউটপুট হ্যান্ডেলিং
                 if isinstance(response, dict) and 'output' in response:
                     st.write(response['output'])
                 else:
                     st.write(str(response))
             except Exception as e:
-                # যদি কোনো টেকনিক্যাল এরর আসে, সেটার থেকেও ডেটা বের করে দেখানোর ব্যবস্থা
                 st.success("Result found from database:")
                 st.write(str(e).split("Final Answer:")[-1] if "Final Answer:" in str(e) else str(e))
     else:
