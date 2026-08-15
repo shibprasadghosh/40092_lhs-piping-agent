@@ -53,7 +53,7 @@ if st.button("Search Database"):
         with st.spinner("Searching through LHS database... 🕵️‍♂️"):
             try:
                 # জেমিনি মডেল কনফিগার করা
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('models/gemini-1.5-flash')
                 
                 # ডেটাসেটের কলাম এবং কিছু নমুনা ডেটা দিয়ে জেমিনিকে পাইথন কোড জেনারেট করতে বলা হচ্ছে
                 prompt = f"""
