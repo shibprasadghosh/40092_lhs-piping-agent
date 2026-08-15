@@ -1,4 +1,7 @@
 streamlit
 pandas
 openpyxl
+langchain
+langchain-experimental
+langchain-google-genai
 google-generativeai
