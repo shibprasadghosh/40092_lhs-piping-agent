@@ -18,21 +18,19 @@ def log_visitor(query_text):
         f.write(f"Time: {timestamp} | Query: {query_text}\n")
 
 @st.cache_resource
-def load_data_and_model():
+def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
     
-    # ম্যাজিক ট্রিক: আমরা কোনো নাম ফিক্স করছি না! 
-    # তোমার API Key যে মডেল সাপোর্ট করে, কোড নিজে থেকে সেটাই খুঁজে নেবে।
-    valid_model = None
+    # তোমার API কী যে যে মডেল সাপোর্ট করে তার একটা লিস্ট বানাচ্ছি
+    available_models = []
     for m in genai.list_models():
         if 'generateContent' in m.supported_generation_methods:
-            valid_model = m.name
-            break
+            available_models.append(m.name)
             
-    return df, valid_model
+    return df, available_models
 
-df, auto_model_name = load_data_and_model()
+df, model_list = load_data_and_models()
 
 st.subheader("Quick Search:")
 col1, col2 = st.columns(2)
@@ -45,34 +43,49 @@ user_query = st.text_input("Enter your question here:", key="query")
 
 if st.button("Search Database"):
     if user_query:
-        if not auto_model_name:
-            st.error("Error: Your API Key does not have access to any text generation models.")
+        if not model_list:
+            st.error("Error: No valid text models found for this API Key.")
         else:
             log_visitor(user_query)
-            with st.spinner(f"Searching using auto-detected model ({auto_model_name})... 🕵️‍♂️"):
-                try:
-                    model = genai.GenerativeModel(auto_model_name)
-                    prompt = f"""
-                    You are an expert data analyst working with a Pandas DataFrame named `df`.
-                    The columns of the dataframe are: {list(df.columns)}
-                    
-                    The user asked this question: "{user_query}"
-                    
-                    Write ONLY executable Python code using pandas to get the answer from `df`. 
-                    Store the final result in a variable named `result`. 
-                    Do not include markdown like ```python in your response.
-                    """
-                    response = model.generate_content(prompt)
-                    code = response.text.replace("```python", "").replace("```", "").strip()
-                    
-                    local_vars = {"df": df, "pd": pd}
-                    exec(code, {}, local_vars)
-                    
-                    final_res = local_vars.get("result", "No result variable found.")
-                    st.success("Result found from database:")
-                    st.write(final_res)
-                except Exception as e:
-                    st.error(f"Error executing query: {e}")
+            with st.spinner("Bypassing Google restrictions & searching database... 🕵️‍♂️"):
+                success = False
+                error_logs = []
+                
+                prompt = f"""
+                You are an expert data analyst working with a Pandas DataFrame named `df`.
+                The columns of the dataframe are: {list(df.columns)}
+                
+                The user asked this question: "{user_query}"
+                
+                Write ONLY executable Python code using pandas to get the answer from `df`. 
+                Store the final result in a variable named `result`. 
+                Do not include markdown like ```python in your response.
+                """
+                
+                # লুপ চালিয়ে সব মডেল চেক করা হচ্ছে, যেটা কাজ করবে সেটা দিয়েই রেজাল্ট দেখাবে
+                for m_name in model_list:
+                    try:
+                        model = genai.GenerativeModel(m_name)
+                        response = model.generate_content(prompt)
+                        code = response.text.replace("```python", "").replace("```", "").strip()
+                        
+                        local_vars = {"df": df, "pd": pd}
+                        exec(code, {}, local_vars)
+                        
+                        final_res = local_vars.get("result", "No result variable found.")
+                        
+                        st.success(f"✅ Success! (Powered by {m_name})")
+                        st.write(final_res)
+                        success = True
+                        break # কাজ হয়ে গেলে লুপ বন্ধ!
+                    except Exception as e:
+                        error_logs.append(f"Failed with {m_name}: {str(e)}")
+                        continue # ফেইল করলে পরের মডেল ট্রাই করবে
+                
+                if not success:
+                    st.error("❌ Google API is blocking all available models. Error details:")
+                    for err in error_logs:
+                        st.write(err)
     else:
         st.warning("Please enter a question first!")
 
