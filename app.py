@@ -55,7 +55,12 @@ if st.button("Search Database"):
                 # জেমিনি মডেল কনফিগার করা
                 model = genai.GenerativeModel('gemini-pro')
                 
-                # ডেটাসেটের কলাম এবং কিছু নমুনা ডেটা দিয়ে জেমিনিকে পাইথন কোড জেনারেট করতে বলা হচ্ছে
+                safety_settings = [
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                ]
+                
+                # ডেটাসেটের কলাম এবং কিছু নমুনা ডেটা দিয়ে জেমিনিকে পাইথন কোড জেনারেট করতে বলা হচ্ছে
                 prompt = f"""
                 You are an expert data analyst working with a Pandas DataFrame named `df`.
                 The columns of the dataframe are: {list(df.columns)}
@@ -67,7 +72,7 @@ if st.button("Search Database"):
                 Do not include any markdown formatting like ```python or ``` in your response, just output the raw python code lines. Ensure `result` is printed or formatted properly.
                 """
                 
-                response = model.generate_content(prompt)
+                response = model.generate_content(prompt, safety_settings=safety_settings)
                 code = response.text.replace("```python", "").replace("```", "").strip()
                 
                 # সেফলি পাইথন কোড এক্সিকিউট করা
