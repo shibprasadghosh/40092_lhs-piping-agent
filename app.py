@@ -31,7 +31,7 @@ def log_visitor(query_text):
 def load_agent():
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", dtype=str)
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash-latest", temperature=0)
     
     prefix = "You are a helpful assistant for LHS piping projects. Always provide concise and accurate data from the dataframe."
     agent = create_pandas_dataframe_agent(llm, df, verbose=True, allow_dangerous_code=True, handle_parsing_errors=True, prefix=prefix)
