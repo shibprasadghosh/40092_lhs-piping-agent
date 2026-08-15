@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 from datetime import datetime
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_experimental.agents import create_pandas_dataframe_agent
+import google.generativeai as genai
 
 # পেজ কনফিগারেশন
 st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
@@ -26,34 +25,21 @@ def log_visitor(query_text):
     with open("visitor_log.txt", "a", encoding="utf-8") as f:
         f.write(log_entry)
 
-# ডেটাবেস ও এজেন্ট লোড (gemini-pro ব্যবহার করা হলো যা শতভাগ স্টেবল এবং 404 মুক্ত)
+# ডেটাবেস লোড 
 @st.cache_resource
-def load_agent():
-    os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
+def load_data():
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
-    
-    # gemini-pro মডেল ব্যবহার করা হচ্ছে যা এপিআই তে কোনো 404 এরর দেবে না
-    llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0)
-    
-    prefix = "You are a helpful assistant for LHS piping projects. Always provide concise and accurate data from the dataframe."
-    agent = create_pandas_dataframe_agent(
-        llm, 
-        df, 
-        verbose=True, 
-        allow_dangerous_code=True, 
-        handle_parsing_errors=True, 
-        prefix=prefix
-    )
-    return agent
+    return df
 
-with st.spinner("Loading LHS Database & AI Agent... 🚀"):
-    agent = load_agent()
+df = load_data()
 
 # কুইক বাটন
 st.subheader("Quick Search:")
 col1, col2 = st.columns(2)
 if col1.button("Show Area 1P25A1 Progress"):
-    st.session_state.query = "Show me the status of joints in Area 1P25A1"
+    st.session_state.query = "What is the total number of joints in Area 1P25A1?"
 if col2.button("List all Welder No. 69 works"):
     st.session_state.query = "Find all rows where Welder No. is 69"
 
@@ -66,20 +52,39 @@ if st.button("Search Database"):
         
         with st.spinner("Searching through LHS database... 🕵️‍♂️"):
             try:
-                response = agent.invoke({"input": user_query + " You MUST start your final output exactly with the words 'Final Answer: '"})
-                st.success("Result found!")
+                # সরাসরি জেমিনির লেটেস্ট মডেল কনফিগার করা
+                model = genai.GenerativeModel('gemini-1.5-flash')
                 
-                if isinstance(response, dict) and 'output' in response:
-                    st.write(response['output'])
-                else:
-                    st.write(str(response))
-            except Exception as e:
+                safety_settings = [
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                ]
+                
+                prompt = f"""
+                You are an expert data analyst working with a Pandas DataFrame named `df`.
+                The columns of the dataframe are: {list(df.columns)}
+                
+                The user asked this question: "{user_query}"
+                
+                Write ONLY executable Python code using pandas to get the answer from `df`. 
+                Store the final result in a variable named `result`. 
+                Do not include any markdown formatting like ```python or ``` in your response, just output the raw python code lines. Ensure `result` is printed or formatted properly.
+                """
+                
+                response = model.generate_content(prompt, safety_settings=safety_settings)
+                code = response.text.replace("```python", "").replace("```", "").strip()
+                
+                # সেফলি পাইথন কোড এক্সিকিউট করা
+                local_vars = {"df": df, "pd": pd}
+                exec(code, {}, local_vars)
+                
+                final_res = local_vars.get("result", "No result variable found.")
+                
                 st.success("Result found from database:")
-                error_str = str(e)
-                if "Final Answer:" in error_str:
-                    st.write(error_str.split("Final Answer:")[-1])
-                else:
-                    st.write(error_str)
+                st.write(final_res)
+                
+            except Exception as e:
+                st.error(f"Error executing query: {e}")
     else:
         st.warning("Please enter a question first!")
 
