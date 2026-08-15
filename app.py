@@ -31,7 +31,9 @@ def log_visitor(query_text):
 def load_agent():
     os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_API_KEY"]
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0)
+    
+    # মডেলের নাম সরাসরি 'gemini-pro' বা সঠিক এপিআই ফরম্যাটে দেওয়া হলো যাতে 404 এরর না আসে
+    llm = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0)
     
     prefix = "You are a helpful assistant for LHS piping projects. Always provide concise and accurate data from the dataframe."
     agent = create_pandas_dataframe_agent(llm, df, verbose=True, allow_dangerous_code=True, handle_parsing_errors=True, prefix=prefix)
@@ -57,16 +59,15 @@ if st.button("Search Database"):
         
         with st.spinner("Searching through LHS database... 🕵️‍♂️"):
             try:
-                response = agent.invoke({"input": user_query + " You MUST start your final output exactly with the words 'Final Answer: '"})
+                response = agent.invoke(user_query)
                 st.success("Result found!")
-                # আউটপুট হ্যান্ডেলিং
                 if isinstance(response, dict) and 'output' in response:
                     st.write(response['output'])
                 else:
                     st.write(str(response))
             except Exception as e:
                 st.success("Result found from database:")
-                st.write(str(e).split("Final Answer:")[-1] if "Final Answer:" in str(e) else str(e))
+                st.write(str(e))
     else:
         st.warning("Please enter a question first!")
 
