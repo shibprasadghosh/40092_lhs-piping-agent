@@ -52,7 +52,7 @@ if st.button("Search Database"):
         
         with st.spinner("Searching through LHS database... 🕵️‍♂️"):
             try:
-                # সরাসরি জেমিনির লেটেস্ট মডেল কনফিগার করা
+                # জেমিনির সবচেয়ে স্টেবল ও লেটেস্ট মডেল নাম
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 safety_settings = [
@@ -74,7 +74,6 @@ if st.button("Search Database"):
                 response = model.generate_content(prompt, safety_settings=safety_settings)
                 code = response.text.replace("```python", "").replace("```", "").strip()
                 
-                # সেফলি পাইথন কোড এক্সিকিউট করা
                 local_vars = {"df": df, "pd": pd}
                 exec(code, {}, local_vars)
                 
