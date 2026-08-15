@@ -52,7 +52,7 @@ if st.button("Search Database"):
         
         with st.spinner("Searching through LHS database... 🕵️‍♂️"):
             try:
-                # এখানে মডেল নাম 'gemini-1.5-flash' ব্যবহার করা হলো এবং সঠিক কনফিগারেশন দেওয়া হলো
+                # শুধুমাত্র লেটেস্ট মডেল ব্যবহার করা হচ্ছে, কোনো 'gemini-pro' নেই
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 
                 safety_settings = [
@@ -83,18 +83,7 @@ if st.button("Search Database"):
                 st.write(final_res)
                 
             except Exception as e:
-                # যদি কোনো কারণে মডেলের নামে এরর আসে, তবে সরাসরি অন্য পদ্ধতিতে ফলব্যাক করার ব্যবস্থা
-                try:
-                    model_fallback = genai.GenerativeModel('gemini-pro')
-                    response = model_fallback.generate_content(prompt)
-                    code = response.text.replace("```python", "").replace("```", "").strip()
-                    local_vars = {"df": df, "pd": pd}
-                    exec(code, {}, local_vars)
-                    final_res = local_vars.get("result", "No result variable found.")
-                    st.success("Result found from database (Fallback):")
-                    st.write(final_res)
-                except Exception as err:
-                    st.error(f"Error executing query: {err}")
+                st.error(f"Error executing query: {e}")
     else:
         st.warning("Please enter a question first!")
 
