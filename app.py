@@ -100,7 +100,7 @@ st.markdown("---")
 
 # --- AI Natural Language Search ---
 st.subheader("💬 Or Ask AI (Custom Question):")
-user_query = st.text_input("Enter your question here (Leave blank if using filters above):")
+user_query = st.text_input("Enter your question here in your preffered language (Leave blank if using filters above):")
 
 if st.button("Search Database"):
     active_query = user_query.strip()
