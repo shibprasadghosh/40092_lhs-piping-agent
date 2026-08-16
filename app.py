@@ -36,31 +36,48 @@ def load_data_and_models():
 
 df, model_list = load_data_and_models()
 
-# --- Dynamic Custom Filter Builder ---
-st.subheader("🎯 Dynamic Filters:")
-st.write("Select any column from your database to filter. Click '+' to add more filter fields.")
+# --- Smart Cascading Filter Builder ---
+st.subheader("🎯 Smart Dynamic Filters:")
+st.write("Select columns to filter. Options will dynamically update based on your previous selections!")
 
-if 'filter_rows' not in st.session_state:
-    st.session_state.filter_rows = 1
+# ফিল্টার ট্র্যাকিং লজিক
+if 'filter_ids' not in st.session_state:
+    st.session_state.filter_ids = [0]
+    st.session_state.next_id = 1
 
 def add_filter_row():
-    st.session_state.filter_rows += 1
+    st.session_state.filter_ids.append(st.session_state.next_id)
+    st.session_state.next_id += 1
+
+def remove_filter_row(fid):
+    st.session_state.filter_ids.remove(fid)
 
 active_conditions = []
+# ক্যাসকেডিং এর জন্য একটা ডাইনামিক ডেটাফ্রেম যেটা প্রতি ফিল্টারের সাথে সাথে ছোট হতে থাকবে
+progressive_df = df.copy() 
 
-for i in range(st.session_state.filter_rows):
-    col1, col2 = st.columns(2)
+for i, fid in enumerate(st.session_state.filter_ids):
+    # তিনটি কলাম: Field, Value, আর Delete Button
+    col1, col2, col3 = st.columns([4, 4, 1])
     
-    chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{i}")
+    chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{fid}")
     
     if chosen_col != "(Select a Column)":
-        raw_vals = [str(val).strip() for val in df[chosen_col].unique() if str(val).strip() != '']
+        # ম্যাজিক: অপশনগুলো এখন মেইন 'df' থেকে নয়, 'progressive_df' থেকে আসছে
+        raw_vals = [str(val).strip() for val in progressive_df[chosen_col].unique() if str(val).strip() != '']
         unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
         
-        chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{i}")
+        chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{fid}")
         
         if chosen_val != "(Select a Value)":
             active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
+            # পরের ফিল্টারগুলোর জন্য ডেটাবেসটাকে এখানেই ছোট করে দেওয়া হলো
+            progressive_df = progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+    
+    # ❌ Delete Button
+    with col3:
+        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True) # বাটনটাকে সোজা রাখার জন্য মার্জিন
+        st.button("❌", key=f"del_{fid}", on_click=remove_filter_row, args=(fid,), help="Remove this filter")
 
 st.button("➕ Add Another Filter Field", on_click=add_filter_row)
 
@@ -125,7 +142,6 @@ if st.button("Search Database"):
                     st.success(f"✅ Success! (Powered by {successful_model})")
                     
                     if isinstance(final_res, pd.DataFrame):
-                        # --- BUG FIX: Check if dataframe is empty ---
                         if final_res.empty:
                             st.warning("⚠️ No matching data found! Please try different filters or adjust your question.")
                         else:
@@ -188,12 +204,12 @@ if st.checkbox("📋 View Team Activity Log (Admin Only)"):
     else:
         st.info("No logs yet.")
 
-# --- Footer: Professional Title & Watermark ---
+# --- Footer: Bright and Bold Title & Watermark ---
 st.markdown(
     """
     <br><br>
     <div style='text-align: right; user-select: none; pointer-events: none;'>
-        <span style='color: #A0A0A0; font-size: 14px; font-weight: 500; letter-spacing: 1px;'>🚀 AI-POWERED SMART DATA DASHBOARD</span><br>
+        <span style='color: #E0E0E0; font-size: 16px; font-weight: bold; letter-spacing: 1px;'>🚀 AI-POWERED SMART DATA DASHBOARD</span><br>
         <span style='color: #E0E0E0; font-size: 16px; font-weight: bold;'><i>© Created by Shib Prasad Ghosh</i></span>
     </div>
     """, 
