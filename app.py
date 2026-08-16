@@ -20,6 +20,7 @@ def log_visitor(query_text):
 @st.cache_resource
 def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+    # এক্সেল থেকে ডেটা লোড
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
     
     available_models = []
@@ -31,14 +32,35 @@ def load_data_and_models():
 
 df, model_list = load_data_and_models()
 
-# --- Quick Filter Section ---
-st.subheader("🎯 Quick Filters:")
+# ডেটাবেস থেকে ইউনিক (Unique) ভ্যালু খুঁজে ড্রপডাউন বানানোর ফাংশন
+def get_dropdown_options(col_name):
+    for col in df.columns:
+        if str(col).strip().lower() == col_name.strip().lower():
+            options = df[col].dropna().astype(str).unique().tolist()
+            return [""] + sorted(options)
+    return [""]
+
+# --- Quick Filter Section (Dropdowns) ---
+st.subheader("🎯 Quick Filters (Select to filter):")
 col1, col2, col3, col4, col5 = st.columns(5)
-f_line = col1.text_input("Line No.")
-f_area = col2.text_input("Area")
-f_loop = col3.text_input("Loop No.")
-f_xr = col4.text_input("XR No.")
-f_group = col5.text_input("Group No.")
+f_line = col1.selectbox("Line No.", get_dropdown_options("Line No."))
+f_area = col2.selectbox("Area", get_dropdown_options("Area"))
+f_loop = col3.selectbox("Loop No.", get_dropdown_options("Loop No."))
+f_xr = col4.selectbox("XR No.", get_dropdown_options("XR No."))
+f_group = col5.selectbox("Group No.", get_dropdown_options("Group No."))
+
+st.markdown("---")
+
+# --- Custom Column Filter (Dynamic) ---
+st.subheader("🔍 Custom Column Filter:")
+st.write("Select any column from the database to filter by its exact value:")
+ccol1, ccol2 = st.columns(2)
+custom_col = ccol1.selectbox("Select Database Column", [""] + list(df.columns))
+
+custom_val = ""
+if custom_col:
+    # কলাম সিলেক্ট করলে তবেই তার ভেতরের ভ্যালুর ড্রপডাউনটা আসবে
+    custom_val = ccol2.selectbox(f"Select value for {custom_col}", [""] + sorted(df[custom_col].dropna().astype(str).unique().tolist()))
 
 st.markdown("---")
 
@@ -47,16 +69,18 @@ st.subheader("💬 Or Ask AI (Custom Question):")
 user_query = st.text_input("Enter your question here (Leave blank if using filters above):")
 
 if st.button("Search Database"):
+    # ড্রপডাউন থেকে ফিল্টার কন্ডিশন বানানো
     conditions = []
-    if f_line: conditions.append(f"Line No contains '{f_line}'")
-    if f_area: conditions.append(f"Area contains '{f_area}'")
-    if f_loop: conditions.append(f"Loop No contains '{f_loop}'")
-    if f_xr: conditions.append(f"XR No contains '{f_xr}'")
-    if f_group: conditions.append(f"Group No contains '{f_group}'")
+    if f_line: conditions.append(f"`Line No.` == '{f_line}'")
+    if f_area: conditions.append(f"`Area` == '{f_area}'")
+    if f_loop: conditions.append(f"`Loop No.` == '{f_loop}'")
+    if f_xr: conditions.append(f"`XR No.` == '{f_xr}'")
+    if f_group: conditions.append(f"`Group No.` == '{f_group}'")
+    if custom_col and custom_val: conditions.append(f"`{custom_col}` == '{custom_val}'")
 
     active_query = user_query.strip()
     if conditions:
-        active_query = "Find all rows and show exactly these columns where " + " and ".join(conditions)
+        active_query = "Find all rows where " + " and ".join(conditions) + ". Show all columns."
 
     if active_query:
         if not model_list:
@@ -109,7 +133,7 @@ if st.button("Search Database"):
                     for err in error_logs:
                         st.write(err)
     else:
-        st.warning("Please enter a question or fill at least one filter field first!")
+        st.warning("Please enter a question or select at least one filter first!")
 
 st.markdown("---")
 if st.checkbox("📋 View Team Activity Log (Admin Only)"):
@@ -119,11 +143,12 @@ if st.checkbox("📋 View Team Activity Log (Admin Only)"):
     else:
         st.info("No logs yet.")
 
-# --- Footer: Created by Shib Prasad Ghosh ---
+# --- Footer: Created by Shib Prasad Ghosh (Now fully visible!) ---
 st.markdown(
     """
-    <div style='text-align: right; color: #888888; font-size: 14px; margin-top: 50px;'>
-        <i>Created by <b>Shib Prasad Ghosh</b></i>
+    <br><br>
+    <div style='text-align: right; color: #a0a0a0; font-size: 18px; font-weight: bold;'>
+        🚀 Created by <span style='color: #ffffff;'>Shib Prasad Ghosh</span>
     </div>
     """, 
     unsafe_allow_html=True
