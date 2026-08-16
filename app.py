@@ -22,7 +22,6 @@ def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
     
-    # তোমার API কী যে যে মডেল সাপোর্ট করে তার একটা লিস্ট বানাচ্ছি
     available_models = []
     for m in genai.list_models():
         if 'generateContent' in m.supported_generation_methods:
@@ -32,21 +31,41 @@ def load_data_and_models():
 
 df, model_list = load_data_and_models()
 
-st.subheader("Quick Search:")
-col1, col2 = st.columns(2)
-if col1.button("Show Area 1P25A1 Progress"):
-    st.session_state.query = "What is the total number of joints in Area 1P25A1?"
-if col2.button("List all Welder No. 69 works"):
-    st.session_state.query = "Find all rows where Welder No. is 69"
+# --- নতুন Filter Section ---
+st.subheader("🎯 Quick Filters (নির্দিষ্ট ডেটা খুঁজতে):")
+col1, col2, col3, col4, col5 = st.columns(5)
+f_line = col1.text_input("Line No.")
+f_area = col2.text_input("Area")
+f_loop = col3.text_input("Loop No.")
+f_xr = col4.text_input("XR No.")
+f_group = col5.text_input("Group No.")
 
-user_query = st.text_input("Enter your question here:", key="query")
+st.markdown("---")
+
+# --- AI Natural Language Search ---
+st.subheader("💬 Or Ask AI (Custom Question):")
+user_query = st.text_input("Enter your question here (উপরের ফিল্টার ব্যবহার করলে এটা ফাঁকা রাখুন):")
 
 if st.button("Search Database"):
-    if user_query:
+    # ইউজার ফিল্টারে কিছু লিখলে সেটা থেকে অটোমেটিক AI-এর জন্য Query বানানো
+    conditions = []
+    if f_line: conditions.append(f"Line No contains '{f_line}'")
+    if f_area: conditions.append(f"Area contains '{f_area}'")
+    if f_loop: conditions.append(f"Loop No contains '{f_loop}'")
+    if f_xr: conditions.append(f"XR No contains '{f_xr}'")
+    if f_group: conditions.append(f"Group No contains '{f_group}'")
+
+    # Final query নির্ধারণ করা (ফিল্টার থাকলে সেটা নেবে, না হলে ইউজারের লেখা প্রশ্ন নেবে)
+    active_query = user_query.strip()
+    if conditions:
+        active_query = "Find all rows and show exactly these columns where " + " and ".join(conditions)
+
+    # যদি কোনো ইনপুট দেওয়া হয় তবেই সার্চ শুরু হবে
+    if active_query:
         if not model_list:
             st.error("Error: No valid text models found for this API Key.")
         else:
-            log_visitor(user_query)
+            log_visitor(active_query)
             with st.spinner("Bypassing Google restrictions & searching database... 🕵️‍♂️"):
                 success = False
                 error_logs = []
@@ -57,14 +76,13 @@ if st.button("Search Database"):
                 
                 When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
                 
-                The user asked this question: "{user_query}"
+                The user asked this question: "{active_query}"
                 
                 Write ONLY executable Python code using pandas to get the answer from `df`. 
                 Store the final result in a variable named `result`. 
                 Do not include markdown like ```python in your response.
                 """
                 
-                # লুপ চালিয়ে সব মডেল চেক করা হচ্ছে, যেটা কাজ করবে সেটা দিয়েই রেজাল্ট দেখাবে
                 for m_name in model_list:
                     try:
                         model = genai.GenerativeModel(m_name)
@@ -77,22 +95,25 @@ if st.button("Search Database"):
                         final_res = local_vars.get("result", "No result variable found.")
                         
                         st.success(f"✅ Success! (Powered by {m_name})")
+                        
+                        # নতুন দৃষ্টিনন্দন টেবিল ডিসপ্লে করার লজিক
                         if isinstance(final_res, pd.DataFrame):
                             st.dataframe(final_res, hide_index=True, use_container_width=False)
                         else:
                             st.write(final_res)
+                            
                         success = True
-                        break # কাজ হয়ে গেলে লুপ বন্ধ!
+                        break 
                     except Exception as e:
                         error_logs.append(f"Failed with {m_name}: {str(e)}")
-                        continue # ফেইল করলে পরের মডেল ট্রাই করবে
+                        continue 
                 
                 if not success:
                     st.error("❌ Google API is blocking all available models. Error details:")
                     for err in error_logs:
                         st.write(err)
     else:
-        st.warning("Please enter a question first!")
+        st.warning("Please enter a question or fill at least one filter field first!")
 
 st.markdown("---")
 if st.checkbox("📋 View Team Activity Log (Admin Only)"):
