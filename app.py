@@ -64,14 +64,7 @@ if st.button("Search Database"):
                 Do not include markdown like ```python in your response.
                 """
                 
-                The user asked this question: "{user_query}"
-                
-                Write ONLY executable Python code using pandas to get the answer from `df`. 
-                Store the final result in a variable named `result`. 
-                Do not include markdown like ```python in your response.
-                """
-                
-                # লুপ চালিয়ে সব মডেল চেক করা হচ্ছে, যেটা কাজ করবে সেটা দিয়েই রেজাল্ট দেখাবে
+                # লুপ চালিয়ে সব মডেল চেক করা হচ্ছে, যেটা কাজ করবে সেটা দিয়েই রেজাল্ট দেখাবে
                 for m_name in model_list:
                     try:
                         model = genai.GenerativeModel(m_name)
@@ -86,7 +79,7 @@ if st.button("Search Database"):
                         st.success(f"✅ Success! (Powered by {m_name})")
                         st.write(final_res)
                         success = True
-                        break # কাজ হয়ে গেলে লুপ বন্ধ!
+                        break # কাজ হয়ে গেলে লুপ বন্ধ!
                     except Exception as e:
                         error_logs.append(f"Failed with {m_name}: {str(e)}")
                         continue # ফেইল করলে পরের মডেল ট্রাই করবে
