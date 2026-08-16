@@ -54,7 +54,10 @@ for i in range(st.session_state.filter_rows):
     chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{i}")
     
     if chosen_col != "(Select a Column)":
-        unique_vals = ["(Select a Value)"] + sorted([val for val in df[chosen_col].unique() if str(val).strip() != ''])
+        # BUG FIX: সাজানোর আগে সব ভ্যালুকে Text-এ কনভার্ট করে নিচ্ছি
+        raw_vals = [str(val).strip() for val in df[chosen_col].unique() if str(val).strip() != '']
+        unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
+        
         chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{i}")
         
         if chosen_val != "(Select a Value)":
@@ -119,19 +122,16 @@ if st.button("Search Database"):
                             
                             display_df = final_res.copy()
                             if hide_empty:
-                                # 'None' বা ফাঁকা ঘরগুলোকে সরিয়ে দেওয়া
                                 display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA)
                                 display_df = display_df.dropna(axis=1, how='all')
                                 display_df = display_df.fillna('')
                             
-                            # টেবিল ডিসপ্লে করা
                             st.dataframe(display_df, hide_index=True, use_container_width=False)
                             
                             # --- ডাউনলোড অপশন (CSV + Excel) ---
                             st.markdown("### 📥 Download Results")
                             dl_col1, dl_col2, _ = st.columns([1, 1, 2])
                             
-                            # ডাউনলোড করার ফাইলে ওয়াটারমার্ক যোগ করা
                             dl_df = display_df.copy()
                             dl_df.loc[len(dl_df)] = [""] * len(dl_df.columns)
                             watermark_row = [""] * len(dl_df.columns)
