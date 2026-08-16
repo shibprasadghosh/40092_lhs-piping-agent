@@ -77,7 +77,10 @@ if st.button("Search Database"):
                         final_res = local_vars.get("result", "No result variable found.")
                         
                         st.success(f"✅ Success! (Powered by {m_name})")
-                        st.write(final_res)
+                        if isinstance(final_res, pd.DataFrame):
+                            st.dataframe(final_res, hide_index=True, use_container_width=False)
+                        else:
+                            st.write(final_res)
                         success = True
                         break # কাজ হয়ে গেলে লুপ বন্ধ!
                     except Exception as e:
