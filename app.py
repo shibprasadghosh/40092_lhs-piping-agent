@@ -193,8 +193,18 @@ if st.session_state.search_result_df is not None:
             df_w.loc[len(df_w)] = w_row
             return df_w
         
-        # --- Safe Numeric Converter ফাংশন ---
-        def safe_numeric(val):
+        # --- Smart Numeric Converter ---
+        def safe_numeric(val, col_name):
+            str_val = str(val).strip()
+            
+            # বিলিং কোড, WPS বা জয়েন্ট নাম্বারের মতো ফিল্ডে হাত দেবে না
+            if any(k in col_name.upper() for k in ['BILL', 'CODE', 'WPS', 'JOINT', 'REV', 'LINE']):
+                return val
+                
+            # যদি ডেটার শুরুতে '0' থাকে (যেমন '00020.80'), তবে ওটাকে টেক্সট হিসেবেই রাখবে
+            if str_val.startswith('0') and len(str_val) > 1 and not str_val.startswith('0.'):
+                return val
+                
             try:
                 f_val = float(val)
                 return int(f_val) if f_val.is_integer() else f_val
@@ -213,11 +223,12 @@ if st.session_state.search_result_df is not None:
             mime="text/csv"
         )
         
-        # 2. Excel Download
+        # 2. Excel Download (স্মার্ট কনভার্টার সহ)
         try:
             excel_df = display_df.copy()
             for col in excel_df.columns:
-                excel_df[col] = excel_df[col].apply(safe_numeric)
+                # কলামের নাম সহ ফাংশন কল করা হচ্ছে
+                excel_df[col] = excel_df[col].apply(lambda x: safe_numeric(x, col))
             
             excel_df = add_watermark(excel_df)
             
