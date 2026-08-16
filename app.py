@@ -51,9 +51,12 @@ if st.button("Search Database"):
                 success = False
                 error_logs = []
                 
-                prompt = f"""
+              prompt = f"""
                 You are an expert data analyst working with a Pandas DataFrame named `df`.
                 The columns of the dataframe are: {list(df.columns)}
+                
+                When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
+"""
                 
                 The user asked this question: "{user_query}"
                 
