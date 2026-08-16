@@ -20,7 +20,6 @@ def log_visitor(query_text):
 @st.cache_resource
 def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # এক্সেল থেকে ডেটা লোড
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
     
     available_models = []
@@ -32,35 +31,31 @@ def load_data_and_models():
 
 df, model_list = load_data_and_models()
 
-# ডেটাবেস থেকে ইউনিক (Unique) ভ্যালু খুঁজে ড্রপডাউন বানানোর ফাংশন
-def get_dropdown_options(col_name):
-    for col in df.columns:
-        if str(col).strip().lower() == col_name.strip().lower():
-            options = df[col].dropna().astype(str).unique().tolist()
-            return [""] + sorted(options)
-    return [""]
+# --- Dynamic Custom Filter Builder ---
+st.subheader("🎯 Dynamic Filters:")
+st.write("Select any column from your database to filter. Click '+' to add more filter fields.")
 
-# --- Quick Filter Section (Dropdowns) ---
-st.subheader("🎯 Quick Filters (Select to filter):")
-col1, col2, col3, col4, col5 = st.columns(5)
-f_line = col1.selectbox("Line No.", get_dropdown_options("Line No."))
-f_area = col2.selectbox("Area", get_dropdown_options("Area"))
-f_loop = col3.selectbox("Loop No.", get_dropdown_options("Loop No."))
-f_xr = col4.selectbox("XR No.", get_dropdown_options("XR No."))
-f_group = col5.selectbox("Group No.", get_dropdown_options("Group No."))
+if 'filter_rows' not in st.session_state:
+    st.session_state.filter_rows = 1
 
-st.markdown("---")
+def add_filter_row():
+    st.session_state.filter_rows += 1
 
-# --- Custom Column Filter (Dynamic) ---
-st.subheader("🔍 Custom Column Filter:")
-st.write("Select any column from the database to filter by its exact value:")
-ccol1, ccol2 = st.columns(2)
-custom_col = ccol1.selectbox("Select Database Column", [""] + list(df.columns))
+active_conditions = []
 
-custom_val = ""
-if custom_col:
-    # কলাম সিলেক্ট করলে তবেই তার ভেতরের ভ্যালুর ড্রপডাউনটা আসবে
-    custom_val = ccol2.selectbox(f"Select value for {custom_col}", [""] + sorted(df[custom_col].dropna().astype(str).unique().tolist()))
+for i in range(st.session_state.filter_rows):
+    col1, col2 = st.columns(2)
+    
+    chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{i}")
+    
+    if chosen_col != "(Select a Column)":
+        unique_vals = ["(Select a Value)"] + sorted(df[chosen_col].dropna().astype(str).unique().tolist())
+        chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{i}")
+        
+        if chosen_val != "(Select a Value)":
+            active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
+
+st.button("➕ Add Another Filter Field", on_click=add_filter_row)
 
 st.markdown("---")
 
@@ -69,18 +64,14 @@ st.subheader("💬 Or Ask AI (Custom Question):")
 user_query = st.text_input("Enter your question here (Leave blank if using filters above):")
 
 if st.button("Search Database"):
-    # ড্রপডাউন থেকে ফিল্টার কন্ডিশন বানানো
-    conditions = []
-    if f_line: conditions.append(f"`Line No.` == '{f_line}'")
-    if f_area: conditions.append(f"`Area` == '{f_area}'")
-    if f_loop: conditions.append(f"`Loop No.` == '{f_loop}'")
-    if f_xr: conditions.append(f"`XR No.` == '{f_xr}'")
-    if f_group: conditions.append(f"`Group No.` == '{f_group}'")
-    if custom_col and custom_val: conditions.append(f"`{custom_col}` == '{custom_val}'")
-
     active_query = user_query.strip()
-    if conditions:
-        active_query = "Find all rows where " + " and ".join(conditions) + ". Show all columns."
+    
+    if active_conditions:
+        auto_query = "Find all rows where " + " and ".join(active_conditions) + ". Show all columns."
+        if active_query:
+            active_query = auto_query + " Furthermore, apply this condition: " + active_query
+        else:
+            active_query = auto_query
 
     if active_query:
         if not model_list:
@@ -115,10 +106,28 @@ if st.button("Search Database"):
                         
                         final_res = local_vars.get("result", "No result variable found.")
                         
-                        st.success(f"✅ Success! (Powered by {m_name})")
+                        st.success(f"✅ Success! (Powered by AI)")
                         
                         if isinstance(final_res, pd.DataFrame):
+                            # টেবিল ডিসপ্লে করা
                             st.dataframe(final_res, hide_index=True, use_container_width=False)
+                            
+                            # --- ডাউনলোড এর জন্য ওয়াটারমার্ক লজিক ---
+                            dl_df = final_res.copy()
+                            # একটা ফাঁকা লাইন যোগ করা
+                            dl_df.loc[len(dl_df)] = [""] * len(dl_df.columns)
+                            # ওয়াটারমার্ক লাইন যোগ করা
+                            watermark_row = [""] * len(dl_df.columns)
+                            watermark_row[0] = "© Generated by LHS AI Assistant - Created by Shib Prasad Ghosh"
+                            dl_df.loc[len(dl_df)] = watermark_row
+                            
+                            csv = dl_df.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="📥 Download Result (CSV)",
+                                data=csv,
+                                file_name=f"LHS_Search_Result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv"
+                            )
                         else:
                             st.write(final_res)
                             
@@ -143,12 +152,12 @@ if st.checkbox("📋 View Team Activity Log (Admin Only)"):
     else:
         st.info("No logs yet.")
 
-# --- Footer: Created by Shib Prasad Ghosh (Now fully visible!) ---
+# --- Footer: Subtle Watermark for Webpage ---
 st.markdown(
     """
     <br><br>
-    <div style='text-align: right; color: #a0a0a0; font-size: 18px; font-weight: bold;'>
-        🚀 Created by <span style='color: #ffffff;'>Shib Prasad Ghosh</span>
+    <div style='text-align: right; color: rgba(255, 255, 255, 0.15); font-size: 14px; font-weight: normal; user-select: none; pointer-events: none;'>
+        <i>© Created by Shib Prasad Ghosh</i>
     </div>
     """, 
     unsafe_allow_html=True
