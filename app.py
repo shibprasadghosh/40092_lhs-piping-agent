@@ -31,8 +31,8 @@ def load_data_and_models():
 
 df, model_list = load_data_and_models()
 
-# --- নতুন Filter Section ---
-st.subheader("🎯 Quick Filters (নির্দিষ্ট ডেটা খুঁজতে):")
+# --- Quick Filter Section ---
+st.subheader("🎯 Quick Filters:")
 col1, col2, col3, col4, col5 = st.columns(5)
 f_line = col1.text_input("Line No.")
 f_area = col2.text_input("Area")
@@ -44,10 +44,9 @@ st.markdown("---")
 
 # --- AI Natural Language Search ---
 st.subheader("💬 Or Ask AI (Custom Question):")
-user_query = st.text_input("Enter your question here (উপরের ফিল্টার ব্যবহার করলে এটা ফাঁকা রাখুন):")
+user_query = st.text_input("Enter your question here (Leave blank if using filters above):")
 
 if st.button("Search Database"):
-    # ইউজার ফিল্টারে কিছু লিখলে সেটা থেকে অটোমেটিক AI-এর জন্য Query বানানো
     conditions = []
     if f_line: conditions.append(f"Line No contains '{f_line}'")
     if f_area: conditions.append(f"Area contains '{f_area}'")
@@ -55,18 +54,16 @@ if st.button("Search Database"):
     if f_xr: conditions.append(f"XR No contains '{f_xr}'")
     if f_group: conditions.append(f"Group No contains '{f_group}'")
 
-    # Final query নির্ধারণ করা (ফিল্টার থাকলে সেটা নেবে, না হলে ইউজারের লেখা প্রশ্ন নেবে)
     active_query = user_query.strip()
     if conditions:
         active_query = "Find all rows and show exactly these columns where " + " and ".join(conditions)
 
-    # যদি কোনো ইনপুট দেওয়া হয় তবেই সার্চ শুরু হবে
     if active_query:
         if not model_list:
             st.error("Error: No valid text models found for this API Key.")
         else:
             log_visitor(active_query)
-            with st.spinner("Bypassing Google restrictions & searching database... 🕵️‍♂️"):
+            with st.spinner("Bypassing restrictions & searching database... 🕵️‍♂️"):
                 success = False
                 error_logs = []
                 
@@ -96,7 +93,6 @@ if st.button("Search Database"):
                         
                         st.success(f"✅ Success! (Powered by {m_name})")
                         
-                        # নতুন দৃষ্টিনন্দন টেবিল ডিসপ্লে করার লজিক
                         if isinstance(final_res, pd.DataFrame):
                             st.dataframe(final_res, hide_index=True, use_container_width=False)
                         else:
@@ -122,3 +118,13 @@ if st.checkbox("📋 View Team Activity Log (Admin Only)"):
             st.text_area("Activity Logs", f.read(), height=150)
     else:
         st.info("No logs yet.")
+
+# --- Footer: Created by Shib Prasad Ghosh ---
+st.markdown(
+    """
+    <div style='text-align: right; color: #888888; font-size: 14px; margin-top: 50px;'>
+        <i>Created by <b>Shib Prasad Ghosh</b></i>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
