@@ -23,11 +23,9 @@ def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
     
-    # 1. Data Cleaning (Whitespace & Uppercase)
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
     
-    # 2. BULLETPROOF SAFE DATE CLEANER
     for col in df.columns:
         if 'DATE' in col.upper():
             df[col] = df[col].apply(lambda x: str(x).split(' ')[0] if pd.notna(x) and str(x).upper() not in ['NAN', 'NAT', '', 'NONE'] else '')
@@ -202,17 +200,9 @@ if st.session_state.search_result_df is not None:
             mime="text/csv"
         )
         
-        # 2. Excel Download (সংখ্যাগুলোকে রিয়েল নাম্বারে কনভার্ট করার লজিক সহ)
+        # 2. Excel Download (বিনা ঝামেলায় স্মুথ ডাউনলোড)
         try:
-            excel_df = display_df.copy()
-            # যে কলামগুলো সংখ্যা হতে পারে সেগুলোকে নাম্বারে কনভার্ট করা (যাতে সবুজ ট্রায়াঙ্গেল না থাকে)
-            for col in excel_df.columns:
-                # যদি কলামের নাম SL, NO, DIA, THK, SPOOL, RT ইত্যাদি হয় অথবা নিউমেরিক ডেটা থাকে
-                if any(k in col.upper() for k in ['SL', 'DIA', 'THK', 'SPOOL', 'RT', '%', 'WPS', 'GROUP']):
-                    excel_df[col] = pd.to_numeric(excel_df[col], errors='ignore')
-            
-            excel_df = add_watermark(excel_df)
-            
+            excel_df = add_watermark(display_df)
             excel_buffer = io.BytesIO()
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 excel_df.to_excel(writer, index=False, sheet_name='Search_Result')
