@@ -17,7 +17,7 @@ st.sidebar.info("- Check welding joint status\n- Track area-wise work progress\n
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("👤 User Authentication")
-user_name = st.sidebar.text_input("Enter Your Name / Emp ID:", placeholder="E.g. SP Ghosh or Emp-102")
+user_name = st.sidebar.text_input("Enter Your Name / Emp ID:", placeholder="E.g. Shib Prasad Ghosh (EMP-100949)")
 st.sidebar.caption("⚠️ Required for tracking database queries.")
 
 # --- Set Indian Standard Time (IST) ---
