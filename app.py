@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import io
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import google.generativeai as genai
 
 st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
@@ -13,8 +13,11 @@ st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Dat
 st.sidebar.title("🛠️ Project LHS Info")
 st.sidebar.info("- Check welding joint status\n- Track area-wise work progress\n- Find spool numbers & welder details")
 
+# --- Set Indian Standard Time (IST) ---
+IST = timezone(timedelta(hours=5, minutes=30))
+
 def log_visitor(query_text):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
     with open("visitor_log.txt", "a", encoding="utf-8") as f:
         f.write(f"Time: {timestamp} | Query: {query_text}\n")
 
@@ -196,11 +199,11 @@ if st.session_state.search_result_df is not None:
         dl_col1.download_button(
             label="📄 Download as CSV",
             data=csv,
-            file_name=f"LHS_Search_Result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"LHS_Search_Result_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
         
-        # 2. Excel Download (বিনা ঝামেলায় স্মুথ ডাউনলোড)
+        # 2. Excel Download
         try:
             excel_df = add_watermark(display_df)
             excel_buffer = io.BytesIO()
@@ -211,7 +214,7 @@ if st.session_state.search_result_df is not None:
             dl_col2.download_button(
                 label="📊 Download as Excel",
                 data=excel_data,
-                file_name=f"LHS_Search_Result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                file_name=f"LHS_Search_Result_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         except ModuleNotFoundError:
