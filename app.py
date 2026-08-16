@@ -35,13 +35,15 @@ def load_data_and_models():
 
 df, model_list = load_data_and_models()
 
-# --- Smart Cascading Filter Builder ---
-st.subheader("🎯 Smart Dynamic Filters:")
-st.write("Select columns to filter. Options will dynamically update based on your previous selections!")
-
+# --- Session State Management ---
 if 'filter_ids' not in st.session_state:
     st.session_state.filter_ids = [0]
+if 'next_id' not in st.session_state:
     st.session_state.next_id = 1
+if 'search_result_df' not in st.session_state:
+    st.session_state.search_result_df = None
+if 'success_msg' not in st.session_state:
+    st.session_state.success_msg = ""
 
 def add_filter_row():
     st.session_state.filter_ids.append(st.session_state.next_id)
@@ -49,6 +51,21 @@ def add_filter_row():
 
 def remove_filter_row(fid):
     st.session_state.filter_ids.remove(fid)
+
+# --- 🔄 Reset / Refresh Function ---
+def reset_dashboard():
+    st.session_state.filter_ids = [0]
+    st.session_state.next_id = 1
+    st.session_state.search_result_df = None
+    st.session_state.success_msg = ""
+
+# --- Smart Cascading Filter Builder ---
+st.subheader("🎯 Smart Dynamic Filters:")
+col_f_title, col_f_btn = st.columns([4, 1])
+with col_f_title:
+    st.write("Select columns to filter. Options will dynamically update based on your previous selections!")
+with col_f_btn:
+    st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
 
 active_conditions = []
 progressive_df = df.copy() 
@@ -79,11 +96,6 @@ st.markdown("---")
 # --- AI Natural Language Search ---
 st.subheader("💬 Or Ask AI (Custom Question):")
 user_query = st.text_input("Enter your question here (Leave blank if using filters above):")
-
-if 'search_result_df' not in st.session_state:
-    st.session_state.search_result_df = None
-if 'success_msg' not in st.session_state:
-    st.session_state.success_msg = ""
 
 if st.button("Search Database"):
     active_query = user_query.strip()
@@ -167,7 +179,6 @@ if st.session_state.search_result_df is not None:
         st.markdown("### 📥 Download Results")
         dl_col1, dl_col2, _ = st.columns([1, 1, 2])
         
-        # কমন ওয়াটারমার্ক রো তৈরির ফাংশন
         def add_watermark(d_frame):
             df_w = d_frame.copy()
             df_w.loc[len(df_w)] = [""] * len(df_w.columns)
