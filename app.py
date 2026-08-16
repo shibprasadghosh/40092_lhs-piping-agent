@@ -27,12 +27,12 @@ def load_data_and_models():
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
     
-    # 2. DATE CLEANER (Time Part 00:00:00 মুছে ফেলা)
+    # 2. SAFE DATE CLEANER (স্ট্রিং ম্যানিপুলেশন দিয়ে 00:00:00 উড়িয়ে দেওয়া)
     for col in df.columns:
-        if 'DATE' in col.upper(): # যে কলামের নামে DATE আছে
-            df[col] = pd.to_datetime(df[col], errors='ignore')
-            # যদি ডেট হয়, তবে শুধু ডেট পার্ট রাখা
-            df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d') if isinstance(x, pd.Timestamp) else x)
+        if 'DATE' in col.upper():
+            # যদি ডেটের সাথে টাইম থাকে (যেমন '2026-03-31 00:00:00'), তবে শুধু প্রথম অংশটা নেব
+            df[col] = df[col].astype(str).apply(lambda x: x.split(' ')[0] if ' ' in x else x)
+            df[col] = df[col].replace({'NAN': '', 'NAT': '', 'NATTYPE': ''})
     
     available_models = []
     for m in genai.list_models():
