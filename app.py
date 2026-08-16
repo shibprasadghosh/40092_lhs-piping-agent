@@ -23,8 +23,16 @@ def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
     
+    # 1. Data Cleaning (Whitespace & Uppercase)
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
+    
+    # 2. DATE CLEANER (Time Part 00:00:00 মুছে ফেলা)
+    for col in df.columns:
+        if 'DATE' in col.upper(): # যে কলামের নামে DATE আছে
+            df[col] = pd.to_datetime(df[col], errors='ignore')
+            # যদি ডেট হয়, তবে শুধু ডেট পার্ট রাখা
+            df[col] = df[col].apply(lambda x: x.strftime('%Y-%m-%d') if isinstance(x, pd.Timestamp) else x)
     
     available_models = []
     for m in genai.list_models():
@@ -37,9 +45,9 @@ df, model_list = load_data_and_models()
 
 # --- Session State Management ---
 if 'filter_ids' not in st.session_state:
-    st.session_state.filter_ids = [0]
+    st.session_state.filter_ids = []
 if 'next_id' not in st.session_state:
-    st.session_state.next_id = 1
+    st.session_state.next_id = 0
 if 'search_result_df' not in st.session_state:
     st.session_state.search_result_df = None
 if 'success_msg' not in st.session_state:
@@ -52,10 +60,9 @@ def add_filter_row():
 def remove_filter_row(fid):
     st.session_state.filter_ids.remove(fid)
 
-# --- 🔄 Reset / Refresh Function ---
 def reset_dashboard():
-    st.session_state.filter_ids = [0]
-    st.session_state.next_id = 1
+    st.session_state.filter_ids = []
+    st.session_state.next_id = 0
     st.session_state.search_result_df = None
     st.session_state.success_msg = ""
 
@@ -63,7 +70,7 @@ def reset_dashboard():
 st.subheader("🎯 Smart Dynamic Filters:")
 col_f_title, col_f_btn = st.columns([4, 1])
 with col_f_title:
-    st.write("Select columns to filter. Options will dynamically update based on your previous selections!")
+    st.write("Click '+' to add filter fields. Options will dynamically update based on your selections!")
 with col_f_btn:
     st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
 
@@ -187,7 +194,6 @@ if st.session_state.search_result_df is not None:
             df_w.loc[len(df_w)] = w_row
             return df_w
         
-        # 1. CSV Download
         csv_df = add_watermark(display_df)
         csv = csv_df.to_csv(index=False).encode('utf-8')
         dl_col1.download_button(
@@ -197,7 +203,6 @@ if st.session_state.search_result_df is not None:
             mime="text/csv"
         )
         
-        # 2. Excel Download
         try:
             excel_df = add_watermark(display_df)
             excel_buffer = io.BytesIO()
