@@ -17,13 +17,12 @@ st.sidebar.info("- Check welding joint status\n- Track area-wise work progress\n
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("👤 User Authentication")
-user_name = st.sidebar.text_input("Enter Your Name / Emp ID:", placeholder="E.g. Shib Prasad Ghosh (EMP-100949)")
+user_name = st.sidebar.text_input("Enter Your Name / Emp ID:", placeholder="E.g. SP Ghosh or Emp-102")
 st.sidebar.caption("⚠️ Required for tracking database queries.")
 
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# --- Log Function (Upgraded to CSV for Excel Download) ---
 def log_visitor(name, query_text):
     timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
     file_exists = os.path.isfile("visitor_log.csv")
@@ -31,7 +30,7 @@ def log_visitor(name, query_text):
     with open("visitor_log.csv", "a", newline='', encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["Date & Time", "User Name", "Search Query"]) # Header
+            writer.writerow(["Date & Time", "User Name", "Search Query"])
         writer.writerow([timestamp, name, query_text])
 
 @st.cache_resource
@@ -42,9 +41,20 @@ def load_data_and_models():
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
     
+    # --- Date Format changed to DD-MM-YYYY ---
+    def format_date_dd_mm_yyyy(val):
+        if pd.isna(val) or str(val).strip().upper() in ['NAN', 'NAT', '', 'NONE']:
+            return ''
+        try:
+            # প্রথমে ডেটটাকে রিড করে তারপর DD-MM-YYYY তে কনভার্ট করবে
+            dt_obj = pd.to_datetime(str(val).split(' ')[0])
+            return dt_obj.strftime('%d-%m-%Y')
+        except:
+            return str(val).split(' ')[0]
+
     for col in df.columns:
         if 'DATE' in col.upper():
-            df[col] = df[col].apply(lambda x: str(x).split(' ')[0] if pd.notna(x) and str(x).upper() not in ['NAN', 'NAT', '', 'NONE'] else '')
+            df[col] = df[col].apply(format_date_dd_mm_yyyy)
     
     available_models = []
     for m in genai.list_models():
@@ -74,7 +84,6 @@ def add_filter_row():
 def remove_filter_row(fid):
     st.session_state.filter_ids.remove(fid)
 
-# --- 🔄 Reset / Refresh Function ---
 def reset_dashboard():
     st.session_state.filter_ids = []
     st.session_state.next_id = 0
@@ -144,11 +153,14 @@ if st.button("Search Database"):
                     successful_model = ""
                     error_logs = []
                     
+                    # --- AI Prompt Updated for Exact Match ---
                     prompt = f"""
                     You are an expert data analyst working with a Pandas DataFrame named `df`.
                     The columns of the dataframe are: {list(df.columns)}
                     
-                    When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
+                    CRITICAL RULES:
+                    1. When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
+                    2. If the user asks for a specific ID, Number, or Code (e.g., 'XR-2', 'Spool 8', 'SJ-21'), you MUST use EXACT MATCHING (e.g., `df['XR NO.'] == 'XR-2'`) rather than partial string matching (`str.contains`). This ensures that 'XR-20' or 'XR-24' do not appear when asking for 'XR-2'.
                     
                     The user asked this question: "{active_query}"
                     
@@ -162,7 +174,6 @@ if st.button("Search Database"):
                             model = genai.GenerativeModel(m_name)
                             response = model.generate_content(prompt)
                             
-                            # 100% Copy-Paste safe trick using chr(96) for backticks
                             bt = chr(96) * 3
                             code = response.text.replace(bt + "python", "").replace(bt, "").strip()
                             
@@ -262,7 +273,6 @@ if st.session_state.search_result_df is not None:
 
 st.markdown("---")
 
-# --- 💡 User Suggestion & Feedback Box ---
 with st.expander("💡 Give Feedback / Suggestion for Improvement"):
     st.write("We are constantly improving! Let us know what features you want next.")
     with st.form("feedback_form"):
@@ -281,7 +291,6 @@ with st.expander("💡 Give Feedback / Suggestion for Improvement"):
 
 st.markdown("---")
 
-# --- 📋 Admin Panel (Logs & Suggestions Download) ---
 if st.checkbox("⚙️ View Admin Panel (Logs & Suggestions)"):
     tab1, tab2 = st.tabs(["📊 User Search Logs", "📝 Suggestions Received"])
     
@@ -312,7 +321,6 @@ if st.checkbox("⚙️ View Admin Panel (Logs & Suggestions)"):
         else:
             st.info("No suggestions received yet.")
 
-# --- Footer ---
 st.markdown(
     """
     <br><br>
