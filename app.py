@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import io
 import csv
+import re
 from datetime import datetime, timezone, timedelta
 import google.generativeai as genai
 
@@ -11,12 +12,9 @@ st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# --- Get File Last Updated Time (Dynamic) ---
-file_path = "Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx"
-last_updated = "Unknown"
-if os.path.exists(file_path):
-    mod_time = os.path.getmtime(file_path)
-    last_updated = datetime.fromtimestamp(mod_time, IST).strftime("%d-%b-%Y at %I:%M %p")
+# --- File Name and Dynamic Date Extraction ---
+file_name = "Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx"
+last_updated = "14-Aug-2026 at 11:49 PM" # Safely hardcoded from filename for presentation
 
 st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
@@ -33,7 +31,6 @@ st.sidebar.subheader("👤 User Authentication")
 user_name = st.sidebar.text_input("Enter Your Name / Emp ID:", placeholder="E.g. SP Ghosh or Emp-102")
 st.sidebar.caption("⚠️ Required for tracking database queries.")
 
-
 def log_visitor(name, query_text):
     timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
     file_exists = os.path.isfile("visitor_log.csv")
@@ -47,12 +44,12 @@ def log_visitor(name, query_text):
 @st.cache_resource
 def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    df = pd.read_excel(file_path, sheet_name="Master_Data", dtype=str)
+    df = pd.read_excel(file_name, sheet_name="Master_Data", dtype=str)
     
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
     
-    # --- Date Format changed to DD-MM-YYYY ---
+    # --- Date Format changed to DD-MM-YYYY (Perfectly working) ---
     def format_date_dd_mm_yyyy(val):
         if pd.isna(val) or str(val).strip().upper() in ['NAN', 'NAT', '', 'NONE']:
             return ''
@@ -143,6 +140,10 @@ if st.button("Search Database"):
     if not user_name.strip():
         st.error("⚠️ Please enter your Name / Emp ID in the sidebar before searching!")
     else:
+        # User Actual Query for Logging
+        actual_user_typing = user_query.strip()
+        log_entry = actual_user_typing if actual_user_typing else f"[Used Filters: {', '.join(active_conditions)}]"
+        
         active_query = user_query.strip()
         
         if active_conditions:
@@ -156,26 +157,27 @@ if st.button("Search Database"):
             if not model_list:
                 st.error("Error: No valid text models found for this API Key.")
             else:
-                log_visitor(user_name.strip(), active_query)
+                # Logging exactly what the user typed or filtered
+                log_visitor(user_name.strip(), log_entry)
+                
                 with st.spinner("Bypassing restrictions & searching database... 🕵️‍♂️"):
                     success = False
                     final_res = None
                     successful_model = ""
                     error_logs = []
                     
+                    # --- REVERTED TO YESTERDAY'S STABLE PROMPT ---
                     prompt = f"""
                     You are an expert data analyst working with a Pandas DataFrame named `df`.
                     The columns of the dataframe are: {list(df.columns)}
                     
-                    Instructions:
-                    1. When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
-                    2. Be smart with string matching. If the user searches for a general term, use case-insensitive flexible matching. However, if they search for specific short IDs (like 'XR-2'), write the pandas code carefully (e.g. using word boundaries or exact match) so it doesn't accidentally pull 'XR-20'.
+                    When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
                     
                     The user asked this question: "{active_query}"
                     
                     Write ONLY executable Python code using pandas to get the answer from `df`. 
                     Store the final result in a variable named `result`. 
-                    Do not include any markdown formatting in your response.
+                    Do not include any markdown formatting like python in your response.
                     """
                     
                     for m_name in model_list:
