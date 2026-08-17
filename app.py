@@ -8,8 +8,21 @@ import google.generativeai as genai
 
 st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 
+# --- Set Indian Standard Time (IST) ---
+IST = timezone(timedelta(hours=5, minutes=30))
+
+# --- Get File Last Updated Time (Dynamic) ---
+file_path = "Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx"
+last_updated = "Unknown"
+if os.path.exists(file_path):
+    mod_time = os.path.getmtime(file_path)
+    last_updated = datetime.fromtimestamp(mod_time, IST).strftime("%d-%b-%Y at %I:%M %p")
+
 st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
+
+# --- UI: Display Last Updated Date ---
+st.info(f"📅 **Database Last Updated On:** {last_updated}")
 
 # --- Sidebar & User Tracking ---
 st.sidebar.title("🛠️ Project LHS Info")
@@ -20,8 +33,6 @@ st.sidebar.subheader("👤 User Authentication")
 user_name = st.sidebar.text_input("Enter Your Name / Emp ID:", placeholder="E.g. SP Ghosh or Emp-102")
 st.sidebar.caption("⚠️ Required for tracking database queries.")
 
-# --- Set Indian Standard Time (IST) ---
-IST = timezone(timedelta(hours=5, minutes=30))
 
 def log_visitor(name, query_text):
     timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
@@ -36,7 +47,7 @@ def log_visitor(name, query_text):
 @st.cache_resource
 def load_data_and_models():
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    df = pd.read_excel("Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx", sheet_name="Master_Data", dtype=str)
+    df = pd.read_excel(file_path, sheet_name="Master_Data", dtype=str)
     
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
@@ -46,7 +57,6 @@ def load_data_and_models():
         if pd.isna(val) or str(val).strip().upper() in ['NAN', 'NAT', '', 'NONE']:
             return ''
         try:
-            # প্রথমে ডেটটাকে রিড করে তারপর DD-MM-YYYY তে কনভার্ট করবে
             dt_obj = pd.to_datetime(str(val).split(' ')[0])
             return dt_obj.strftime('%d-%m-%Y')
         except:
@@ -153,14 +163,13 @@ if st.button("Search Database"):
                     successful_model = ""
                     error_logs = []
                     
-                    # --- AI Prompt Updated for Exact Match ---
                     prompt = f"""
                     You are an expert data analyst working with a Pandas DataFrame named `df`.
                     The columns of the dataframe are: {list(df.columns)}
                     
-                    CRITICAL RULES:
+                    Instructions:
                     1. When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
-                    2. If the user asks for a specific ID, Number, or Code (e.g., 'XR-2', 'Spool 8', 'SJ-21'), you MUST use EXACT MATCHING (e.g., `df['XR NO.'] == 'XR-2'`) rather than partial string matching (`str.contains`). This ensures that 'XR-20' or 'XR-24' do not appear when asking for 'XR-2'.
+                    2. Be smart with string matching. If the user searches for a general term, use case-insensitive flexible matching. However, if they search for specific short IDs (like 'XR-2'), write the pandas code carefully (e.g. using word boundaries or exact match) so it doesn't accidentally pull 'XR-20'.
                     
                     The user asked this question: "{active_query}"
                     
