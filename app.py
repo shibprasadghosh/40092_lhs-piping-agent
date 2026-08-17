@@ -3,7 +3,6 @@ import pandas as pd
 import os
 import io
 import csv
-import re
 from datetime import datetime, timezone, timedelta
 import google.generativeai as genai
 
@@ -140,7 +139,6 @@ if st.button("Search Database"):
     if not user_name.strip():
         st.error("⚠️ Please enter your Name / Emp ID in the sidebar before searching!")
     else:
-        # User Actual Query for Logging
         actual_user_typing = user_query.strip()
         log_entry = actual_user_typing if actual_user_typing else f"[Used Filters: {', '.join(active_conditions)}]"
         
@@ -157,7 +155,6 @@ if st.button("Search Database"):
             if not model_list:
                 st.error("Error: No valid text models found for this API Key.")
             else:
-                # Logging exactly what the user typed or filtered
                 log_visitor(user_name.strip(), log_entry)
                 
                 with st.spinner("Bypassing restrictions & searching database... 🕵️‍♂️"):
@@ -166,12 +163,26 @@ if st.button("Search Database"):
                     successful_model = ""
                     error_logs = []
                     
-                    # --- REVERTED TO YESTERDAY'S STABLE PROMPT ---
+                    # --- SMART MODEL SORTING (Banning 'lite' models for better logic) ---
+                    smart_models = [m for m in model_list if 'pro' in m.lower()] + \
+                                   [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
+                    
+                    # Fallback to lite only if no pro/flash exist
+                    if not smart_models:
+                        smart_models = model_list
+                        
+                    # Remove duplicates while maintaining order
+                    ordered_models = list(dict.fromkeys(smart_models))
+                    
+                    # --- STRICT AI PROMPT ---
                     prompt = f"""
                     You are an expert data analyst working with a Pandas DataFrame named `df`.
                     The columns of the dataframe are: {list(df.columns)}
                     
-                    When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
+                    CRITICAL RULES FOR SEARCHING:
+                    1. When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
+                    2. COLUMN-SPECIFIC MATCHING: If the user searches for an ID like "IBR XR-2" or "XR-2", you MUST identify the correct specific column (e.g., 'XR NO.') and match it exactly or cleanly using Pandas string methods. 
+                    3. DO NOT search blindly across all columns (For example, NEVER return a row just because 'WPS NO' has '2' and 'GROUP' has 'IBR' when the user asked for 'IBR XR-2'). Match the entire ID in a single relevant column.
                     
                     The user asked this question: "{active_query}"
                     
@@ -180,7 +191,7 @@ if st.button("Search Database"):
                     Do not include any markdown formatting like python in your response.
                     """
                     
-                    for m_name in model_list:
+                    for m_name in ordered_models:
                         try:
                             model = genai.GenerativeModel(m_name)
                             response = model.generate_content(prompt)
