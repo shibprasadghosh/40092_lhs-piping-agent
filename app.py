@@ -48,7 +48,6 @@ def load_data_and_models():
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
     
-    # --- Date Format changed to DD-MM-YYYY (Perfectly working) ---
     def format_date_dd_mm_yyyy(val):
         if pd.isna(val) or str(val).strip().upper() in ['NAN', 'NAT', '', 'NONE']:
             return ''
@@ -163,32 +162,26 @@ if st.button("Search Database"):
                     successful_model = ""
                     error_logs = []
                     
-                    # --- SMART MODEL SORTING (Banning 'lite' models for better logic) ---
                     smart_models = [m for m in model_list if 'pro' in m.lower()] + \
                                    [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
-                    
-                    # Fallback to lite only if no pro/flash exist
                     if not smart_models:
                         smart_models = model_list
-                        
-                    # Remove duplicates while maintaining order
                     ordered_models = list(dict.fromkeys(smart_models))
                     
-                    # --- STRICT AI PROMPT ---
+                    # --- BULLETPROOF EXACT MATCH PROMPT ---
                     prompt = f"""
                     You are an expert data analyst working with a Pandas DataFrame named `df`.
                     The columns of the dataframe are: {list(df.columns)}
                     
                     CRITICAL RULES FOR SEARCHING:
-                    1. When generating the output table, strictly add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include the original Excel row numbers or dataframe index.
-                    2. COLUMN-SPECIFIC MATCHING: If the user searches for an ID like "IBR XR-2" or "XR-2", you MUST identify the correct specific column (e.g., 'XR NO.') and match it exactly or cleanly using Pandas string methods. 
-                    3. DO NOT search blindly across all columns (For example, NEVER return a row just because 'WPS NO' has '2' and 'GROUP' has 'IBR' when the user asked for 'IBR XR-2'). Match the entire ID in a single relevant column.
+                    1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
+                    2. PREVENT PARTIAL MATCH BUGS: When searching for an ID containing numbers (like "IBR XR-2", "XR-2", "Spool 5"), you MUST NOT use `.str.contains()`. You MUST use exact matching to prevent "XR-2" from accidentally bringing up "XR-20" or "XR-23".
+                    - CORRECT EXACT MATCH LOGIC: `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
+                    3. Identify the most logical column name based on context (e.g. 'XR NO.' for 'XR-2').
                     
-                    The user asked this question: "{active_query}"
+                    User requested: "{active_query}"
                     
-                    Write ONLY executable Python code using pandas to get the answer from `df`. 
-                    Store the final result in a variable named `result`. 
-                    Do not include any markdown formatting like python in your response.
+                    Write ONLY executable Python code using pandas. Store the final result in a variable named `result`. Do not include any markdown formatting like python in your response.
                     """
                     
                     for m_name in ordered_models:
