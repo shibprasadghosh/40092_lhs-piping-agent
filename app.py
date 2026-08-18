@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import io
 import csv
+import glob
 from datetime import datetime, timezone, timedelta
 import google.generativeai as genai
 
@@ -11,14 +12,36 @@ st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# --- File Name and Dynamic Date Extraction ---
-file_name = "Merged_Master_Data_EXCEL_18Aug2026_101942_PM.xlsx"
-last_updated = "14-Aug-2026 at 11:49 PM" # Safely hardcoded from filename for presentation
+# --- AUTO-DETECT FILE AND DYNAMIC DATE PARSING ---
+# ফোল্ডারে থাকা Merged_Master_Data দিয়ে শুরু হওয়া এক্সেল ফাইল খুঁজবে
+excel_files = glob.glob("Merged_Master_Data_EXCEL_*.xlsx")
+
+if excel_files:
+    # যদি একাধিক ফাইল থাকে, তবে লেটেস্ট ফাইলটা নেবে
+    file_name = max(excel_files, key=os.path.getmtime)
+    
+    try:
+        # ফাইলের নাম থেকে ডাইরেক্ট ডেট ও টাইম বের করার লজিক
+        # উদাহরণ: Merged_Master_Data_EXCEL_18Aug2026_101942_PM.xlsx
+        parts = file_name.replace(".xlsx", "").split("_")
+        date_part = parts[4] # 18Aug2026
+        time_part = parts[5] # 101942
+        ampm_part = parts[6] # PM
+        
+        formatted_date = f"{date_part[:2]}-{date_part[2:5]}-{date_part[5:]}" # 18-Aug-2026
+        formatted_time = f"{time_part[:2]}:{time_part[2:4]} {ampm_part}"     # 10:19 PM
+        
+        last_updated = f"{formatted_date} at {formatted_time}"
+    except Exception:
+        last_updated = "Recently Updated"
+else:
+    file_name = None
+    last_updated = "No Data File Found! Please upload the Excel file."
 
 st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
 
-# --- UI: Display Last Updated Date ---
+# --- UI: Display Last Updated Date Dynamically ---
 st.info(f"📅 **Database Last Updated On:** {last_updated}")
 
 # --- Sidebar & User Tracking ---
@@ -40,10 +63,14 @@ def log_visitor(name, query_text):
             writer.writerow(["Date & Time", "User Name", "Search Query"])
         writer.writerow([timestamp, name, query_text])
 
+# ক্যাশিংয়ের সাথে ফাইলের নাম জুড়ে দেওয়া হলো, যাতে নতুন ফাইল এলেই ক্যাশ রিফ্রেশ হয়
 @st.cache_resource
-def load_data_and_models():
+def load_data_and_models(current_file):
+    if not current_file:
+        return pd.DataFrame(), []
+        
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    df = pd.read_excel(file_name, sheet_name="Master_Data", dtype=str)
+    df = pd.read_excel(current_file, sheet_name="Master_Data", dtype=str)
     
     df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
     df = df.replace({'NAN': '', 'NAT': ''})
@@ -68,7 +95,7 @@ def load_data_and_models():
             
     return df, available_models
 
-df, model_list = load_data_and_models()
+df, model_list = load_data_and_models(file_name)
 
 # --- Session State Management ---
 if 'filter_ids' not in st.session_state:
@@ -105,26 +132,27 @@ with col_f_btn:
     st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
 
 active_conditions = []
-progressive_df = df.copy() 
+progressive_df = df.copy() if not df.empty else pd.DataFrame()
 
-for i, fid in enumerate(st.session_state.filter_ids):
-    col1, col2, col3 = st.columns([4, 4, 1])
-    
-    chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{fid}")
-    
-    if chosen_col != "(Select a Column)":
-        raw_vals = [str(val).strip() for val in progressive_df[chosen_col].unique() if str(val).strip() != '']
-        unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
+if not df.empty:
+    for i, fid in enumerate(st.session_state.filter_ids):
+        col1, col2, col3 = st.columns([4, 4, 1])
         
-        chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{fid}")
+        chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{fid}")
         
-        if chosen_val != "(Select a Value)":
-            active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
-            progressive_df = progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
-    
-    with col3:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        st.button("❌", key=f"del_{fid}", on_click=remove_filter_row, args=(fid,), help="Remove this filter")
+        if chosen_col != "(Select a Column)":
+            raw_vals = [str(val).strip() for val in progressive_df[chosen_col].unique() if str(val).strip() != '']
+            unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
+            
+            chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{fid}")
+            
+            if chosen_val != "(Select a Value)":
+                active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
+                progressive_df = progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+        
+        with col3:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            st.button("❌", key=f"del_{fid}", on_click=remove_filter_row, args=(fid,), help="Remove this filter")
 
 st.button("➕ Add Another Filter Field", on_click=add_filter_row)
 
@@ -135,7 +163,9 @@ st.subheader("💬 Or Ask AI (Custom Question):")
 user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="ai_query_input")
 
 if st.button("Search Database"):
-    if not user_name.strip():
+    if df.empty:
+        st.error("⚠️ No data file found. Please upload the Excel dataset first.")
+    elif not user_name.strip():
         st.error("⚠️ Please enter your Name / Emp ID in the sidebar before searching!")
     else:
         actual_user_typing = user_query.strip()
@@ -168,7 +198,6 @@ if st.button("Search Database"):
                         smart_models = model_list
                     ordered_models = list(dict.fromkeys(smart_models))
                     
-                    # --- BULLETPROOF EXACT MATCH PROMPT ---
                     prompt = f"""
                     You are an expert data analyst working with a Pandas DataFrame named `df`.
                     The columns of the dataframe are: {list(df.columns)}
