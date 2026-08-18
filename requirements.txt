@@ -5,3 +5,5 @@ langchain
 langchain-experimental
 langchain-google-genai
 google-generativeai
+gspread==6.0.0
+google-auth==2.27.0
