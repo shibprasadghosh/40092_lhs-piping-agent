@@ -12,31 +12,38 @@ st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# --- AUTO-DETECT FILE AND DYNAMIC DATE PARSING ---
-# ফোল্ডারে থাকা Merged_Master_Data দিয়ে শুরু হওয়া এক্সেল ফাইল খুঁজবে
-excel_files = glob.glob("Merged_Master_Data_EXCEL_*.xlsx")
+# --- ULTRA-FLEXIBLE AUTO-DETECT EXCEL FILE ---
+# যেকোনো .xlsx ফাইল খুঁজবে
+excel_files = glob.glob("*.xlsx")
 
 if excel_files:
-    # যদি একাধিক ফাইল থাকে, তবে লেটেস্ট ফাইলটা নেবে
+    # যদি একাধিক ফাইল থাকে, তবে লেটেস্ট (সবচেয়ে নতুন) ফাইলটা নেবে
     file_name = max(excel_files, key=os.path.getmtime)
     
     try:
-        # ফাইলের নাম থেকে ডাইরেক্ট ডেট ও টাইম বের করার লজিক
-        # উদাহরণ: Merged_Master_Data_EXCEL_18Aug2026_101942_PM.xlsx
-        parts = file_name.replace(".xlsx", "").split("_")
-        date_part = parts[4] # 18Aug2026
-        time_part = parts[5] # 101942
-        ampm_part = parts[6] # PM
-        
-        formatted_date = f"{date_part[:2]}-{date_part[2:5]}-{date_part[5:]}" # 18-Aug-2026
-        formatted_time = f"{time_part[:2]}:{time_part[2:4]} {ampm_part}"     # 10:19 PM
-        
-        last_updated = f"{formatted_date} at {formatted_time}"
+        # চেক করবে এটা Colab থেকে আসা ফাইল কি না
+        if "Merged_Master_Data_EXCEL_" in file_name:
+            parts = file_name.replace(".xlsx", "").split("_")
+            date_part = parts[4] # 18Aug2026
+            time_part = parts[5] # 101942
+            ampm_part = parts[6] # PM
+            
+            formatted_date = f"{date_part[:2]}-{date_part[2:5]}-{date_part[5:]}"
+            formatted_time = f"{time_part[:2]}:{time_part[2:4]} {ampm_part}"
+            
+            last_updated = f"{formatted_date} at {formatted_time}"
+        else:
+            # অন্য কোনো নামের ফাইল হলে সিস্টেমের আপলোড টাইম নেবে
+            mod_time = os.path.getmtime(file_name)
+            last_updated = datetime.fromtimestamp(mod_time, IST).strftime("%d-%b-%Y at %I:%M %p")
+            
     except Exception:
-        last_updated = "Recently Updated"
+        # ব্যাকআপ সেফটি
+        mod_time = os.path.getmtime(file_name)
+        last_updated = datetime.fromtimestamp(mod_time, IST).strftime("%d-%b-%Y at %I:%M %p")
 else:
     file_name = None
-    last_updated = "No Data File Found! Please upload the Excel file."
+    last_updated = "No Data File Found! Please upload an Excel file."
 
 st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
@@ -63,7 +70,6 @@ def log_visitor(name, query_text):
             writer.writerow(["Date & Time", "User Name", "Search Query"])
         writer.writerow([timestamp, name, query_text])
 
-# ক্যাশিংয়ের সাথে ফাইলের নাম জুড়ে দেওয়া হলো, যাতে নতুন ফাইল এলেই ক্যাশ রিফ্রেশ হয়
 @st.cache_resource
 def load_data_and_models(current_file):
     if not current_file:
