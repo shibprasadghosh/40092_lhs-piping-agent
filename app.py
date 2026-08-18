@@ -12,7 +12,7 @@ st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 IST = timezone(timedelta(hours=5, minutes=30))
 
 # --- File Name and Dynamic Date Extraction ---
-file_name = "Merged_Master_Data_EXCEL_14Aug2026_114927_PM.xlsx"
+file_name = "Merged_Master_Data_EXCEL_18Aug2026_101942_PM.xlsx"
 last_updated = "14-Aug-2026 at 11:49 PM" # Safely hardcoded from filename for presentation
 
 st.title("🤖 LHS Project - AI Data Assistant")
