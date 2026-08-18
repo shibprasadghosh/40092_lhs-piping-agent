@@ -6,39 +6,50 @@ import csv
 import glob
 from datetime import datetime, timezone, timedelta
 import google.generativeai as genai
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
+# --- Google Sheets Connection ---
+def get_gspread_client():
+    try:
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        creds_dict = st.secrets["gcp_service_account"]
+        creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        client = gspread.authorize(creds)
+        return client
+    except Exception as e:
+        return None
+
 # --- ULTRA-FLEXIBLE AUTO-DETECT EXCEL FILE ---
-# যেকোনো .xlsx ফাইল খুঁজবে
 excel_files = glob.glob("*.xlsx")
 
 if excel_files:
-    # যদি একাধিক ফাইল থাকে, তবে লেটেস্ট (সবচেয়ে নতুন) ফাইলটা নেবে
     file_name = max(excel_files, key=os.path.getmtime)
     
     try:
-        # চেক করবে এটা Colab থেকে আসা ফাইল কি না
         if "Merged_Master_Data_EXCEL_" in file_name:
             parts = file_name.replace(".xlsx", "").split("_")
-            date_part = parts[4] # 18Aug2026
-            time_part = parts[5] # 101942
-            ampm_part = parts[6] # PM
+            date_part = parts[4] 
+            time_part = parts[5] 
+            ampm_part = parts[6] 
             
             formatted_date = f"{date_part[:2]}-{date_part[2:5]}-{date_part[5:]}"
             formatted_time = f"{time_part[:2]}:{time_part[2:4]} {ampm_part}"
             
             last_updated = f"{formatted_date} at {formatted_time}"
         else:
-            # অন্য কোনো নামের ফাইল হলে সিস্টেমের আপলোড টাইম নেবে
             mod_time = os.path.getmtime(file_name)
             last_updated = datetime.fromtimestamp(mod_time, IST).strftime("%d-%b-%Y at %I:%M %p")
             
     except Exception:
-        # ব্যাকআপ সেফটি
         mod_time = os.path.getmtime(file_name)
         last_updated = datetime.fromtimestamp(mod_time, IST).strftime("%d-%b-%Y at %I:%M %p")
 else:
@@ -48,10 +59,8 @@ else:
 st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
 
-# --- UI: Display Last Updated Date Dynamically ---
 st.info(f"📅 **Database Last Updated On:** {last_updated}")
 
-# --- Sidebar & User Tracking ---
 st.sidebar.title("🛠️ Project LHS Info")
 st.sidebar.info("- Check welding joint status\n- Track area-wise work progress\n- Find spool numbers & welder details")
 
@@ -62,13 +71,23 @@ st.sidebar.caption("⚠️ Required for tracking database queries.")
 
 def log_visitor(name, query_text):
     timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
-    file_exists = os.path.isfile("visitor_log.csv")
     
+    # 1. Save to Local CSV as Backup
+    file_exists = os.path.isfile("visitor_log.csv")
     with open("visitor_log.csv", "a", newline='', encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
             writer.writerow(["Date & Time", "User Name", "Search Query"])
         writer.writerow([timestamp, name, query_text])
+        
+    # 2. Save to Google Sheets
+    try:
+        client = get_gspread_client()
+        if client:
+            sheet = client.open("LHS_App_Logs").worksheet("Search_Logs")
+            sheet.append_row([timestamp, name, query_text])
+    except Exception:
+        pass # Fail silently if GSheets is not connected yet
 
 @st.cache_resource
 def load_data_and_models(current_file):
@@ -103,7 +122,6 @@ def load_data_and_models(current_file):
 
 df, model_list = load_data_and_models(file_name)
 
-# --- Session State Management ---
 if 'filter_ids' not in st.session_state:
     st.session_state.filter_ids = []
 if 'next_id' not in st.session_state:
@@ -129,7 +147,6 @@ def reset_dashboard():
     st.session_state.success_msg = ""
     st.session_state.ai_query_input = "" 
 
-# --- Smart Cascading Filter Builder ---
 st.subheader("🎯 Smart Dynamic Filters:")
 col_f_title, col_f_btn = st.columns([4, 1])
 with col_f_title:
@@ -164,7 +181,6 @@ st.button("➕ Add Another Filter Field", on_click=add_filter_row)
 
 st.markdown("---")
 
-# --- AI Natural Language Search ---
 st.subheader("💬 Or Ask AI (Custom Question):")
 user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="ai_query_input")
 
@@ -333,8 +349,20 @@ with st.expander("💡 Give Feedback / Suggestion for Improvement"):
             if feedback_text.strip():
                 log_time = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
                 uname = user_name.strip() if user_name.strip() else "Anonymous User"
+                
+                # 1. Save locally
                 with open("suggestions_log.txt", "a", encoding="utf-8") as sf:
                     sf.write(f"[{log_time}] {uname}: {feedback_text.strip()}\n")
+                    
+                # 2. Save to Google Sheets
+                try:
+                    client = get_gspread_client()
+                    if client:
+                        sheet = client.open("LHS_App_Logs").worksheet("Suggestions")
+                        sheet.append_row([log_time, uname, feedback_text.strip()])
+                except Exception:
+                    pass
+                
                 st.success("Thank you! Your suggestion has been successfully recorded. 🙏")
             else:
                 st.warning("Please write something before submitting.")
@@ -362,14 +390,14 @@ if st.checkbox("⚙️ View Admin Panel (Logs & Suggestions)"):
             except Exception as e:
                 st.error("Error generating Excel log file.")
         else:
-            st.info("No search logs available yet.")
+            st.info("No search logs available yet locally. (Check Google Sheets if connected)")
             
     with tab2:
         if os.path.exists("suggestions_log.txt"):
             with open("suggestions_log.txt", "r", encoding="utf-8") as sf:
                 st.text_area("All Suggestions", sf.read(), height=250)
         else:
-            st.info("No suggestions received yet.")
+            st.info("No suggestions received yet locally. (Check Google Sheets if connected)")
 
 st.markdown(
     """
