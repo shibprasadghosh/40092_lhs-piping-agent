@@ -14,9 +14,16 @@ st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# --- Session State variables ---
+# --- Session State for Authentication ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 if 'user_name' not in st.session_state:
     st.session_state.user_name = ""
+
+def handle_login():
+    if st.session_state.auth_input.strip():
+        st.session_state.user_name = st.session_state.auth_input.strip()
+        st.session_state.logged_in = True
 
 # --- Google Sheets Connection ---
 def get_gspread_client():
@@ -57,15 +64,15 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- MAIN PAGE: HEADER (ALWAYS VISIBLE) ---
+# --- HEADER (ALWAYS VISIBLE AT TOP) ---
 # ==========================================
 st.title("🤖 LHS Project - AI Data Assistant")
 
-# Colorful & Larger Welcome Message
+# Colorful & Larger Welcome Message (Text size increased as requested)
 st.markdown("""
 <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-    <h2 style="color: #00d2ff; margin-top: 0; font-size: 24px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
-    <p style="color: #e0e0e0; font-size: 18px; margin-bottom: 0; line-height: 1.6;">
+    <h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
+    <p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">
         Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.
     </p>
 </div>
@@ -75,28 +82,28 @@ st.info(f"📅 **Database Last Updated On:** {last_updated}")
 st.markdown("---")
 
 # ==========================================
-# --- GLOBAL AUTHENTICATION (GATEKEEPER) ---
+# --- GATEKEEPER / AUTHENTICATION LOGIC ---
 # ==========================================
-st.markdown("### 👤 User Authentication")
-col_auth1, col_auth2 = st.columns([1, 2])
-with col_auth1:
-    st.text_input("Enter Your Name / Emp ID (Press Enter):", key="user_name", placeholder="E.g. SP Ghosh or Emp-102")
-with col_auth2:
-    st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Required to unlock the dashboard.</div>", unsafe_allow_html=True)
-st.markdown("---")
-
-
-# ==========================================
-# --- LOCK SYSTEM LOGIC ---
-# ==========================================
-if not st.session_state.user_name.strip():
-    # If no name is entered, show a lock message and hide everything else
-    st.warning("🔒 **Dashboard is locked.** Please enter your Name or Emp ID above and press 'Enter' to access the menu and features.")
+if not st.session_state.logged_in:
+    # If not logged in, show ONLY the lock screen
+    st.markdown("### 🔒 Dashboard is Locked")
+    st.warning("Please enter your Name or Emp ID below and press **'Enter'** to unlock the dashboard.")
     
+    col_auth1, col_auth2 = st.columns([1, 2])
+    with col_auth1:
+        st.text_input("Enter Your Name / Emp ID:", key="auth_input", on_change=handle_login, placeholder="E.g. SP Ghosh")
+    with col_auth2:
+        st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Your ID is securely logged for tracking database queries.</div>", unsafe_allow_html=True)
+
 else:
-    # --- IF UNLOCKED: SHOW SIDEBAR AND FEATURES ---
+    # ==========================================
+    # --- MAIN APP (UNLOCKED) ---
+    # ==========================================
     
     st.sidebar.title("🗂️ MAIN MENU")
+    st.sidebar.success(f"👤 Logged in as: **{st.session_state.user_name}**")
+    st.sidebar.markdown("---")
+    
     menu_selection = st.sidebar.radio(
         "Choose a Dashboard:",
         ("🎯 Smart Search & Filters", "📊 Welding Progress Tracking")
