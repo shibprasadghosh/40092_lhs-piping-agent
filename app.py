@@ -59,7 +59,7 @@ st.title("🤖 LHS Project - AI Data Assistant")
 st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
 st.info(f"📅 **Database Last Updated On:** {last_updated}")
 
-# ইউজার অথেন্টিকেশন এখন মেইন পেজে
+# ইউজার অথেন্টিকেশন
 st.markdown("### 👤 User Authentication")
 col_auth1, col_auth2 = st.columns([1, 2])
 with col_auth1:
@@ -73,8 +73,8 @@ st.markdown("---")
 # ==========================================
 st.sidebar.title("🗂️ MAIN MENU")
 menu_selection = st.sidebar.radio(
-    "Choose a Dashboard:",
-    ("🎯 Smart Search & Filters", "📊 Welding Progress Tracking")
+    "Choose an Option:",
+    ("🏠 Home Page", "🎯 Smart Search & Filters", "📊 Welding Progress Tracking")
 )
 
 st.sidebar.markdown("---")
@@ -132,7 +132,10 @@ df, model_list = load_data_and_models(file_name)
 # --- MENU ROUTING LOGIC ---
 # ==========================================
 
-if menu_selection == "📊 Welding Progress Tracking":
+if menu_selection == "🏠 Home Page":
+    st.success("✨ **Dashboard is Ready!** Please select an option from the left 'MAIN MENU' to get started.")
+
+elif menu_selection == "📊 Welding Progress Tracking":
     st.subheader("📈 Welding Progress Dashboard")
     if not df.empty:
         def check_welding(row):
