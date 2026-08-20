@@ -64,36 +64,38 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- HEADER (FROZEN / STICKY AT TOP) - BUG FREE ---
+# --- HEADER (PERFECTLY FROZEN & BUG FREE) ---
 # ==========================================
 
-# Database Update Box (Only generate if Logged In)
+# Database Update Box HTML (Only generated if Logged In)
 db_update_html = ""
 if st.session_state.logged_in:
     db_update_html = f"<div style='background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3); margin-top: 15px;'>📅 <b>Database Last Updated On:</b> {last_updated}</div>"
 
-# Sticky Header Construction with Solid Background & High Z-Index
+# The Sticky Logic with zero transparent gaps
 sticky_header_html = f"""
 <style>
-/* Remove default top padding so header sticks flush to the top */
-.block-container {{ padding-top: 0rem !important; }}
+/* Remove default paddings that cause jumps */
+.block-container {{ padding-top: 1rem !important; }}
 
-/* Target the exact wrapper and make it a solid, impenetrable sticky block */
-div[data-testid="stVerticalBlock"] > div:first-of-type {{
+/* Make the specific header wrapper sticky and SOLID */
+.frozen-header-wrapper {{
     position: sticky;
     top: 0px;
-    z-index: 999999; /* Super high power so nothing overlaps */
-    background-color: #0e1117; /* Solid Dark Theme background color */
-    padding-top: 2.5rem; /* Space from the top edge */
-    padding-bottom: 15px; /* Space before the border */
-    border-bottom: 1px solid #2c333f; /* Subtle bottom border */
+    z-index: 999999;
+    background-color: #0e1117; /* Solid Streamlit Dark Theme color */
+    padding-top: 20px;
+    padding-bottom: 20px;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #2c333f;
 }}
 </style>
-<div>
-    <h1 style="color: white; margin-top: 0; font-size: 36px; padding-bottom: 10px;">🤖 LHS Project - AI Data Assistant</h1>
-    <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-        <h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
-        <p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
+
+<div class="frozen-header-wrapper">
+    <h1 style="color: white; margin: 0; padding-bottom: 15px; font-size: 36px;">🤖 LHS Project - AI Data Assistant</h1>
+    <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin: 0; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+        <h2 style="color: #00d2ff; margin: 0; padding-bottom: 8px; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
+        <p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin: 0; line-height: 1.6;">Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
     </div>
     {db_update_html}
 </div>
