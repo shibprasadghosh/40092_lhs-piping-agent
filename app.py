@@ -14,6 +14,10 @@ st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
 
+# --- Session State variables ---
+if 'user_name' not in st.session_state:
+    st.session_state.user_name = ""
+
 # --- Google Sheets Connection ---
 def get_gspread_client():
     try:
@@ -53,19 +57,21 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- MAIN PAGE: HEADER & AUTHENTICATION ---
+# --- MAIN PAGE: HEADER (FROZEN/ALWAYS VISIBLE) ---
 # ==========================================
 st.title("🤖 LHS Project - AI Data Assistant")
-st.write("Welcome, Dear Project Team! 🚀 Experience the next-generation AI Data Portal for advanced filtering, seamless line tracing, and smart piping insights.")
-st.info(f"📅 **Database Last Updated On:** {last_updated}")
 
-# ইউজার অথেন্টিকেশন
-st.markdown("### 👤 User Authentication")
-col_auth1, col_auth2 = st.columns([1, 2])
-with col_auth1:
-    user_name = st.text_input("Enter Your Name / Emp ID:", placeholder="E.g. SP Ghosh or Emp-102")
-with col_auth2:
-    st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Required for tracking database queries.</div>", unsafe_allow_html=True)
+# Colorful & Larger Welcome Message
+st.markdown("""
+<div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+    <h2 style="color: #00d2ff; margin-top: 0; font-size: 24px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
+    <p style="color: #e0e0e0; font-size: 18px; margin-bottom: 0; line-height: 1.6;">
+        Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.info(f"📅 **Database Last Updated On:** {last_updated}")
 st.markdown("---")
 
 # ==========================================
@@ -155,6 +161,15 @@ elif menu_selection == "📊 Welding Progress Tracking":
         st.warning("No data found!")
 
 elif menu_selection == "🎯 Smart Search & Filters":
+    # ইউজার অথেন্টিকেশন শুধুমাত্র এই সার্চ পেজে দেখানো হবে
+    st.markdown("### 👤 User Authentication")
+    col_auth1, col_auth2 = st.columns([1, 2])
+    with col_auth1:
+        st.text_input("Enter Your Name / Emp ID:", key="user_name", placeholder="E.g. SP Ghosh or Emp-102")
+    with col_auth2:
+        st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Required for tracking database queries.</div>", unsafe_allow_html=True)
+    st.markdown("---")
+
     # --- Original Main Search & Filter Logic ---
     if 'filter_ids' not in st.session_state:
         st.session_state.filter_ids = []
@@ -217,7 +232,7 @@ elif menu_selection == "🎯 Smart Search & Filters":
     if st.button("Search Database"):
         if df.empty:
             st.error("⚠️ No data file found. Please upload the Excel dataset first.")
-        elif not user_name.strip():
+        elif not st.session_state.user_name.strip():
             st.error("⚠️ Please enter your Name / Emp ID in the authentication section above before searching!")
         else:
             actual_user_typing = user_query.strip()
@@ -235,7 +250,7 @@ elif menu_selection == "🎯 Smart Search & Filters":
                 if not model_list:
                     st.error("Error: No valid text models found for this API Key.")
                 else:
-                    log_visitor(user_name.strip(), log_entry)
+                    log_visitor(st.session_state.user_name.strip(), log_entry)
                     with st.spinner("Bypassing restrictions & searching database... 🕵️‍♂️"):
                         success = False
                         final_res = None
@@ -365,7 +380,7 @@ with st.expander("💡 Give Feedback / Suggestion for Improvement"):
         if submit_feedback:
             if feedback_text.strip():
                 log_time = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
-                uname = user_name.strip() if user_name.strip() else "Anonymous User"
+                uname = st.session_state.user_name.strip() if st.session_state.user_name.strip() else "Anonymous User"
                 with open("suggestions_log.txt", "a", encoding="utf-8") as sf:
                     sf.write(f"[{log_time}] {uname}: {feedback_text.strip()}\n")
                 try:
