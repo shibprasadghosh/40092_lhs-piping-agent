@@ -64,28 +64,41 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- HEADER (CLEAN & BUG-FREE) ---
+# --- HEADER (FROZEN / STICKY AT TOP) - BUG FREE ---
 # ==========================================
 
-st.markdown("""
-<style>
-/* Remove default top padding for a cleaner look */
-.block-container { padding-top: 2rem !important; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown('<h1 style="color: white; margin-top: 0; font-size: 36px; padding-bottom: 10px;">🤖 LHS Project - AI Data Assistant</h1>', unsafe_allow_html=True)
-
-st.markdown("""
-<div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-<h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
-<p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
-</div>
-""", unsafe_allow_html=True)
-
 # Database Update Box (Only generate if Logged In)
+db_update_html = ""
 if st.session_state.logged_in:
-    st.markdown(f"<div style='background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3); margin-bottom: 25px;'>📅 <b>Database Last Updated On:</b> {last_updated}</div>", unsafe_allow_html=True)
+    db_update_html = f"<div style='background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3); margin-top: 15px;'>📅 <b>Database Last Updated On:</b> {last_updated}</div>"
+
+# Sticky Header Construction with Solid Background & High Z-Index
+sticky_header_html = f"""
+<style>
+/* Remove default top padding so header sticks flush to the top */
+.block-container {{ padding-top: 0rem !important; }}
+
+/* Target the exact wrapper and make it a solid, impenetrable sticky block */
+div[data-testid="stVerticalBlock"] > div:first-of-type {{
+    position: sticky;
+    top: 0px;
+    z-index: 999999; /* Super high power so nothing overlaps */
+    background-color: #0e1117; /* Solid Dark Theme background color */
+    padding-top: 2.5rem; /* Space from the top edge */
+    padding-bottom: 15px; /* Space before the border */
+    border-bottom: 1px solid #2c333f; /* Subtle bottom border */
+}}
+</style>
+<div>
+    <h1 style="color: white; margin-top: 0; font-size: 36px; padding-bottom: 10px;">🤖 LHS Project - AI Data Assistant</h1>
+    <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+        <h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
+        <p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
+    </div>
+    {db_update_html}
+</div>
+"""
+st.markdown(sticky_header_html, unsafe_allow_html=True)
 
 
 # ==========================================
@@ -98,7 +111,7 @@ if not st.session_state.logged_in:
     
     col_auth1, col_auth2 = st.columns([1, 2])
     with col_auth1:
-        st.text_input("Enter Your Name / Emp ID:", key="auth_input", on_change=handle_login, placeholder="E.g. SP Ghosh")
+        st.text_input("Enter Your Name / Emp ID:", key="auth_input", on_change=handle_login, placeholder="E.g. Shib Prasad Ghosh")
     with col_auth2:
         st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Your ID is securely logged for tracking database queries.</div>", unsafe_allow_html=True)
 
