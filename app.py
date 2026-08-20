@@ -57,7 +57,7 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- MAIN PAGE: HEADER (FROZEN/ALWAYS VISIBLE) ---
+# --- MAIN PAGE: HEADER (ALWAYS VISIBLE) ---
 # ==========================================
 st.title("🤖 LHS Project - AI Data Assistant")
 
@@ -75,353 +75,340 @@ st.info(f"📅 **Database Last Updated On:** {last_updated}")
 st.markdown("---")
 
 # ==========================================
-# --- CUSTOM SIDEBAR MENU ---
+# --- GLOBAL AUTHENTICATION (GATEKEEPER) ---
 # ==========================================
-st.sidebar.title("🗂️ MAIN MENU")
-menu_selection = st.sidebar.radio(
-    "Choose an Option:",
-    ("🏠 Home Page", "🎯 Smart Search & Filters", "📊 Welding Progress Tracking")
-)
+st.markdown("### 👤 User Authentication")
+col_auth1, col_auth2 = st.columns([1, 2])
+with col_auth1:
+    st.text_input("Enter Your Name / Emp ID (Press Enter):", key="user_name", placeholder="E.g. SP Ghosh or Emp-102")
+with col_auth2:
+    st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Required to unlock the dashboard.</div>", unsafe_allow_html=True)
+st.markdown("---")
 
-st.sidebar.markdown("---")
-st.sidebar.caption("© Created by Shib Prasad Ghosh")
 
-# --- Logging and Data Loading Logic ---
-def log_visitor(name, query_text):
-    timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
-    file_exists = os.path.isfile("visitor_log.csv")
-    with open("visitor_log.csv", "a", newline='', encoding="utf-8") as f:
-        writer = csv.writer(f)
-        if not file_exists:
-            writer.writerow(["Date & Time", "User Name", "Search Query"])
-        writer.writerow([timestamp, name, query_text])
-    try:
-        client = get_gspread_client()
-        if client:
-            sheet = client.open("LHS_App_Logs").worksheet("Search_Logs")
-            sheet.append_row([timestamp, name, query_text])
-    except Exception:
-        pass 
-
-@st.cache_resource
-def load_data_and_models(current_file):
-    if not current_file:
-        return pd.DataFrame(), []
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    df = pd.read_excel(current_file, sheet_name="Master_Data", dtype=str)
-    df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
-    df = df.replace({'NAN': '', 'NAT': ''})
+# ==========================================
+# --- LOCK SYSTEM LOGIC ---
+# ==========================================
+if not st.session_state.user_name.strip():
+    # If no name is entered, show a lock message and hide everything else
+    st.warning("🔒 **Dashboard is locked.** Please enter your Name or Emp ID above and press 'Enter' to access the menu and features.")
     
-    def format_date_dd_mm_yyyy(val):
-        if pd.isna(val) or str(val).strip().upper() in ['NAN', 'NAT', '', 'NONE']:
-            return ''
+else:
+    # --- IF UNLOCKED: SHOW SIDEBAR AND FEATURES ---
+    
+    st.sidebar.title("🗂️ MAIN MENU")
+    menu_selection = st.sidebar.radio(
+        "Choose a Dashboard:",
+        ("🎯 Smart Search & Filters", "📊 Welding Progress Tracking")
+    )
+    st.sidebar.markdown("---")
+    st.sidebar.caption("© Created by Shib Prasad Ghosh")
+
+    # Load Data & Models
+    @st.cache_resource
+    def load_data_and_models(current_file):
+        if not current_file:
+            return pd.DataFrame(), []
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        df = pd.read_excel(current_file, sheet_name="Master_Data", dtype=str)
+        df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
+        df = df.replace({'NAN': '', 'NAT': ''})
+        
+        def format_date_dd_mm_yyyy(val):
+            if pd.isna(val) or str(val).strip().upper() in ['NAN', 'NAT', '', 'NONE']:
+                return ''
+            try:
+                dt_obj = pd.to_datetime(str(val).split(' ')[0])
+                return dt_obj.strftime('%d-%m-%Y')
+            except:
+                return str(val).split(' ')[0]
+
+        for col in df.columns:
+            if 'DATE' in col.upper():
+                df[col] = df[col].apply(format_date_dd_mm_yyyy)
+        
+        available_models = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods and 'tts' not in m.name and 'audio' not in m.name:
+                available_models.append(m.name)
+                
+        return df, available_models
+
+    df, model_list = load_data_and_models(file_name)
+
+    # Logging Logic
+    def log_visitor(name, query_text):
+        timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
+        file_exists = os.path.isfile("visitor_log.csv")
+        with open("visitor_log.csv", "a", newline='', encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(["Date & Time", "User Name", "Search Query"])
+            writer.writerow([timestamp, name, query_text])
         try:
-            dt_obj = pd.to_datetime(str(val).split(' ')[0])
-            return dt_obj.strftime('%d-%m-%Y')
-        except:
-            return str(val).split(' ')[0]
+            client = get_gspread_client()
+            if client:
+                sheet = client.open("LHS_App_Logs").worksheet("Search_Logs")
+                sheet.append_row([timestamp, name, query_text])
+        except Exception:
+            pass 
 
-    for col in df.columns:
-        if 'DATE' in col.upper():
-            df[col] = df[col].apply(format_date_dd_mm_yyyy)
-    
-    available_models = []
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods and 'tts' not in m.name and 'audio' not in m.name:
-            available_models.append(m.name)
+    # --- MENU ROUTING ---
+    if menu_selection == "📊 Welding Progress Tracking":
+        st.subheader("📈 Welding Progress Dashboard")
+        if not df.empty:
+            def check_welding(row):
+                val = str(row.get('F&W REPORT', '')).strip().upper()
+                return val != '' and val != 'NAN' and val != 'NONE' and val != 'N/A'
+
+            df['Welding_Done'] = df.apply(check_welding, axis=1)
             
-    return df, available_models
-
-df, model_list = load_data_and_models(file_name)
-
-# ==========================================
-# --- MENU ROUTING LOGIC ---
-# ==========================================
-
-if menu_selection == "🏠 Home Page":
-    st.success("✨ **Dashboard is Ready!** Please select an option from the left 'MAIN MENU' to get started.")
-
-elif menu_selection == "📊 Welding Progress Tracking":
-    st.subheader("📈 Welding Progress Dashboard")
-    if not df.empty:
-        def check_welding(row):
-            val = str(row.get('F&W REPORT', '')).strip().upper()
-            return val != '' and val != 'NAN' and val != 'NONE' and val != 'N/A'
-
-        df['Welding_Done'] = df.apply(check_welding, axis=1)
-        
-        summary = df.groupby(['AREA', 'LINE NO.']).agg(
-            Welding_Scope=('JOINT NO.', 'count'),
-            Welding_Done=('Welding_Done', 'sum')
-        ).reset_index()
-        
-        summary['Welding_%'] = ((summary['Welding_Done'] / summary['Welding_Scope']) * 100).round(1)
-        st.dataframe(summary, use_container_width=True)
-    else:
-        st.warning("No data found!")
-
-elif menu_selection == "🎯 Smart Search & Filters":
-    # ইউজার অথেন্টিকেশন শুধুমাত্র এই সার্চ পেজে দেখানো হবে
-    st.markdown("### 👤 User Authentication")
-    col_auth1, col_auth2 = st.columns([1, 2])
-    with col_auth1:
-        st.text_input("Enter Your Name / Emp ID:", key="user_name", placeholder="E.g. SP Ghosh or Emp-102")
-    with col_auth2:
-        st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Required for tracking database queries.</div>", unsafe_allow_html=True)
-    st.markdown("---")
-
-    # --- Original Main Search & Filter Logic ---
-    if 'filter_ids' not in st.session_state:
-        st.session_state.filter_ids = []
-    if 'next_id' not in st.session_state:
-        st.session_state.next_id = 0
-    if 'search_result_df' not in st.session_state:
-        st.session_state.search_result_df = None
-    if 'success_msg' not in st.session_state:
-        st.session_state.success_msg = ""
-    if 'ai_query_input' not in st.session_state:
-        st.session_state.ai_query_input = ""
-
-    def add_filter_row():
-        st.session_state.filter_ids.append(st.session_state.next_id)
-        st.session_state.next_id += 1
-
-    def remove_filter_row(fid):
-        st.session_state.filter_ids.remove(fid)
-
-    def reset_dashboard():
-        st.session_state.filter_ids = []
-        st.session_state.next_id = 0
-        st.session_state.search_result_df = None
-        st.session_state.success_msg = ""
-        st.session_state.ai_query_input = "" 
-
-    st.subheader("🎯 Smart Dynamic Filters:")
-    col_f_title, col_f_btn = st.columns([4, 1])
-    with col_f_title:
-        st.write("Click '+' to add filter fields. Options will dynamically update based on your selections!")
-    with col_f_btn:
-        st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
-
-    active_conditions = []
-    progressive_df = df.copy() if not df.empty else pd.DataFrame()
-
-    if not df.empty:
-        for i, fid in enumerate(st.session_state.filter_ids):
-            col1, col2, col3 = st.columns([4, 4, 1])
-            chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{fid}")
-            if chosen_col != "(Select a Column)":
-                raw_vals = [str(val).strip() for val in progressive_df[chosen_col].unique() if str(val).strip() != '']
-                unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
-                chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{fid}")
-                if chosen_val != "(Select a Value)":
-                    active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
-                    progressive_df = progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+            summary = df.groupby(['AREA', 'LINE NO.']).agg(
+                Welding_Scope=('JOINT NO.', 'count'),
+                Welding_Done=('Welding_Done', 'sum')
+            ).reset_index()
             
-            with col3:
-                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                st.button("❌", key=f"del_{fid}", on_click=remove_filter_row, args=(fid,), help="Remove this filter")
-
-    st.button("➕ Add Another Filter Field", on_click=add_filter_row)
-
-    st.markdown("---")
-
-    st.subheader("💬 Or Ask AI (Custom Question):")
-    user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="ai_query_input")
-
-    if st.button("Search Database"):
-        if df.empty:
-            st.error("⚠️ No data file found. Please upload the Excel dataset first.")
-        elif not st.session_state.user_name.strip():
-            st.error("⚠️ Please enter your Name / Emp ID in the authentication section above before searching!")
+            summary['Welding_%'] = ((summary['Welding_Done'] / summary['Welding_Scope']) * 100).round(1)
+            st.dataframe(summary, use_container_width=True)
         else:
-            actual_user_typing = user_query.strip()
-            log_entry = actual_user_typing if actual_user_typing else f"[Used Filters: {', '.join(active_conditions)}]"
-            active_query = user_query.strip()
-            
-            if active_conditions:
-                auto_query = "Find all rows where " + " and ".join(active_conditions) + ". Show all columns."
+            st.warning("No data found!")
+
+    elif menu_selection == "🎯 Smart Search & Filters":
+        if 'filter_ids' not in st.session_state:
+            st.session_state.filter_ids = []
+        if 'next_id' not in st.session_state:
+            st.session_state.next_id = 0
+        if 'search_result_df' not in st.session_state:
+            st.session_state.search_result_df = None
+        if 'success_msg' not in st.session_state:
+            st.session_state.success_msg = ""
+
+        def add_filter_row():
+            st.session_state.filter_ids.append(st.session_state.next_id)
+            st.session_state.next_id += 1
+
+        def remove_filter_row(fid):
+            st.session_state.filter_ids.remove(fid)
+
+        def reset_dashboard():
+            st.session_state.filter_ids = []
+            st.session_state.next_id = 0
+            st.session_state.search_result_df = None
+            st.session_state.success_msg = ""
+            if 'ai_query_input' in st.session_state:
+                st.session_state.ai_query_input = "" 
+
+        st.subheader("🎯 Smart Dynamic Filters:")
+        col_f_title, col_f_btn = st.columns([4, 1])
+        with col_f_title:
+            st.write("Click '+' to add filter fields. Options will dynamically update based on your selections!")
+        with col_f_btn:
+            st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
+
+        active_conditions = []
+        progressive_df = df.copy() if not df.empty else pd.DataFrame()
+
+        if not df.empty:
+            for i, fid in enumerate(st.session_state.filter_ids):
+                col1, col2, col3 = st.columns([4, 4, 1])
+                chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"col_{fid}")
+                if chosen_col != "(Select a Column)":
+                    raw_vals = [str(val).strip() for val in progressive_df[chosen_col].unique() if str(val).strip() != '']
+                    unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
+                    chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"val_{fid}")
+                    if chosen_val != "(Select a Value)":
+                        active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
+                        progressive_df = progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+                
+                with col3:
+                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                    st.button("❌", key=f"del_{fid}", on_click=remove_filter_row, args=(fid,), help="Remove this filter")
+
+        st.button("➕ Add Another Filter Field", on_click=add_filter_row)
+
+        st.markdown("---")
+
+        st.subheader("💬 Or Ask AI (Custom Question):")
+        user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="ai_query_input")
+
+        if st.button("Search Database"):
+            if df.empty:
+                st.error("⚠️ No data file found. Please upload the Excel dataset first.")
+            else:
+                actual_user_typing = user_query.strip()
+                log_entry = actual_user_typing if actual_user_typing else f"[Used Filters: {', '.join(active_conditions)}]"
+                active_query = user_query.strip()
+                
+                if active_conditions:
+                    auto_query = "Find all rows where " + " and ".join(active_conditions) + ". Show all columns."
+                    if active_query:
+                        active_query = auto_query + " Furthermore, apply this condition: " + active_query
+                    else:
+                        active_query = auto_query
+
                 if active_query:
-                    active_query = auto_query + " Furthermore, apply this condition: " + active_query
+                    if not model_list:
+                        st.error("Error: No valid text models found for this API Key.")
+                    else:
+                        log_visitor(st.session_state.user_name.strip(), log_entry)
+                        with st.spinner("Bypassing restrictions & searching database... 🕵️‍♂️"):
+                            success = False
+                            final_res = None
+                            successful_model = ""
+                            error_logs = []
+                            
+                            smart_models = [m for m in model_list if 'pro' in m.lower()] + \
+                                           [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
+                            if not smart_models:
+                                smart_models = model_list
+                            ordered_models = list(dict.fromkeys(smart_models))
+                            
+                            prompt = f"""
+                            You are an expert data analyst working with a Pandas DataFrame named `df`.
+                            The columns of the dataframe are: {list(df.columns)}
+                            
+                            CRITICAL RULES FOR SEARCHING:
+                            1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
+                            2. PREVENT PARTIAL MATCH BUGS: When searching for an ID containing numbers, you MUST NOT use `.str.contains()`. You MUST use exact matching.
+                            - CORRECT EXACT MATCH LOGIC: `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
+                            3. Identify the most logical column name based on context.
+                            
+                            User requested: "{active_query}"
+                            
+                            Write ONLY executable Python code using pandas. Store the final result in a variable named `result`. Do not include any markdown formatting like python in your response.
+                            """
+                            
+                            for m_name in ordered_models:
+                                try:
+                                    model = genai.GenerativeModel(m_name)
+                                    response = model.generate_content(prompt)
+                                    bt = chr(96) * 3
+                                    code = response.text.replace(bt + "python", "").replace(bt, "").strip()
+                                    local_vars = {"df": df, "pd": pd}
+                                    exec(code, {}, local_vars)
+                                    final_res = local_vars.get("result", "No result variable found.")
+                                    successful_model = m_name
+                                    success = True
+                                    break 
+                                except Exception as e:
+                                    error_logs.append(f"Failed with {m_name}: {str(e)}")
+                                    continue 
+                            
+                            if success and isinstance(final_res, pd.DataFrame):
+                                st.session_state.search_result_df = final_res
+                                st.session_state.success_msg = f"✅ Success! (Powered by {successful_model})"
+                            else:
+                                st.session_state.search_result_df = None
+                                st.session_state.success_msg = ""
+                                st.error("❌ No matching data found or API error.")
                 else:
-                    active_query = auto_query
+                    st.warning("Please enter a question or select at least one filter first!")
 
-            if active_query:
-                if not model_list:
-                    st.error("Error: No valid text models found for this API Key.")
+        if st.session_state.search_result_df is not None:
+            res_df = st.session_state.search_result_df
+            if res_df.empty:
+                st.warning("⚠️ No matching data found! Please try different filters.")
+            else:
+                st.success(st.session_state.success_msg)
+                hide_empty = st.checkbox("👁️ Hide columns with only 'None' or empty values", value=True)
+                display_df = res_df.copy()
+                if hide_empty:
+                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA)
+                    display_df = display_df.dropna(axis=1, how='all')
+                    display_df = display_df.fillna('')
+                st.dataframe(display_df, hide_index=True, use_container_width=False)
+                
+                st.markdown("### 📥 Download Results")
+                dl_col1, dl_col2, _ = st.columns([1, 1, 2])
+                
+                def add_watermark(d_frame):
+                    df_w = d_frame.copy()
+                    df_w.loc[len(df_w)] = [""] * len(df_w.columns)
+                    w_row = [""] * len(df_w.columns)
+                    w_row[0] = "© Generated by LHS AI-Powered Dashboard - Created by Shib Prasad Ghosh"
+                    df_w.loc[len(df_w)] = w_row
+                    return df_w
+                
+                def safe_numeric(val):
+                    if pd.isna(val) or val == "":
+                        return val
+                    str_val = str(val).strip()
+                    if str_val.startswith('0') and len(str_val) > 1 and str_val[1] != '.':
+                        return val
+                    try:
+                        f_val = float(str_val)
+                        return int(f_val) if f_val.is_integer() else f_val
+                    except (ValueError, TypeError):
+                        return val
+
+                file_time_str = datetime.now(IST).strftime('%Y%m%d_%I%M%S_%p')
+                csv_df = add_watermark(display_df)
+                csv = csv_df.to_csv(index=False).encode('utf-8')
+                dl_col1.download_button(
+                    label="📄 Download as CSV",
+                    data=csv,
+                    file_name=f"LHS_Search_Result_{file_time_str}.csv",
+                    mime="text/csv"
+                )
+                try:
+                    excel_df = display_df.copy()
+                    for col in excel_df.columns:
+                        excel_df[col] = excel_df[col].apply(safe_numeric)
+                    excel_df = add_watermark(excel_df)
+                    excel_buffer = io.BytesIO()
+                    with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                        excel_df.to_excel(writer, index=False, sheet_name='Search_Result')
+                    excel_data = excel_buffer.getvalue()
+                    dl_col2.download_button(
+                        label="📊 Download as Excel",
+                        data=excel_data,
+                        file_name=f"LHS_Search_Result_{file_time_str}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+                except ModuleNotFoundError:
+                    dl_col2.warning("⚠️ Excel download requires 'openpyxl'. Please use CSV.")
+
+    # --- FOOTER & ADMIN PANEL (Only visible if logged in) ---
+    st.markdown("---")
+    with st.expander("💡 Give Feedback / Suggestion for Improvement"):
+        st.write("We are constantly improving! Let us know what features you want next.")
+        with st.form("feedback_form"):
+            feedback_text = st.text_area("Your Suggestion / Feature Request:", placeholder="E.g. Please add a visual chart for weekly progress...")
+            submit_feedback = st.form_submit_button("Submit Suggestion")
+            if submit_feedback:
+                if feedback_text.strip():
+                    log_time = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
+                    uname = st.session_state.user_name.strip()
+                    with open("suggestions_log.txt", "a", encoding="utf-8") as sf:
+                        sf.write(f"[{log_time}] {uname}: {feedback_text.strip()}\n")
+                    try:
+                        client = get_gspread_client()
+                        if client:
+                            sheet = client.open("LHS_App_Logs").worksheet("Suggestions")
+                            sheet.append_row([log_time, uname, feedback_text.strip()])
+                    except Exception:
+                        pass
+                    st.success("Thank you! Your suggestion has been successfully recorded. 🙏")
                 else:
-                    log_visitor(st.session_state.user_name.strip(), log_entry)
-                    with st.spinner("Bypassing restrictions & searching database... 🕵️‍♂️"):
-                        success = False
-                        final_res = None
-                        successful_model = ""
-                        error_logs = []
-                        
-                        smart_models = [m for m in model_list if 'pro' in m.lower()] + \
-                                       [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
-                        if not smart_models:
-                            smart_models = model_list
-                        ordered_models = list(dict.fromkeys(smart_models))
-                        
-                        prompt = f"""
-                        You are an expert data analyst working with a Pandas DataFrame named `df`.
-                        The columns of the dataframe are: {list(df.columns)}
-                        
-                        CRITICAL RULES FOR SEARCHING:
-                        1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
-                        2. PREVENT PARTIAL MATCH BUGS: When searching for an ID containing numbers (like "IBR XR-2", "XR-2", "Spool 5"), you MUST NOT use `.str.contains()`. You MUST use exact matching to prevent "XR-2" from accidentally bringing up "XR-20" or "XR-23".
-                        - CORRECT EXACT MATCH LOGIC: `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
-                        3. Identify the most logical column name based on context (e.g. 'XR NO.' for 'XR-2').
-                        
-                        User requested: "{active_query}"
-                        
-                        Write ONLY executable Python code using pandas. Store the final result in a variable named `result`. Do not include any markdown formatting like python in your response.
-                        """
-                        
-                        for m_name in ordered_models:
-                            try:
-                                model = genai.GenerativeModel(m_name)
-                                response = model.generate_content(prompt)
-                                bt = chr(96) * 3
-                                code = response.text.replace(bt + "python", "").replace(bt, "").strip()
-                                local_vars = {"df": df, "pd": pd}
-                                exec(code, {}, local_vars)
-                                final_res = local_vars.get("result", "No result variable found.")
-                                successful_model = m_name
-                                success = True
-                                break 
-                            except Exception as e:
-                                error_logs.append(f"Failed with {m_name}: {str(e)}")
-                                continue 
-                        
-                        if success and isinstance(final_res, pd.DataFrame):
-                            st.session_state.search_result_df = final_res
-                            st.session_state.success_msg = f"✅ Success! (Powered by {successful_model})"
-                        else:
-                            st.session_state.search_result_df = None
-                            st.session_state.success_msg = ""
-                            st.error("❌ No matching data found or API error.")
+                    st.warning("Please write something before submitting.")
+
+    st.markdown("---")
+    if st.checkbox("⚙️ View Admin Panel (Logs & Suggestions)"):
+        tab1, tab2 = st.tabs(["📊 User Search Logs", "📝 Suggestions Received"])
+        with tab1:
+            if os.path.exists("visitor_log.csv"):
+                log_df = pd.read_csv("visitor_log.csv")
+                st.dataframe(log_df, use_container_width=True)
             else:
-                st.warning("Please enter a question or select at least one filter first!")
-
-    if st.session_state.search_result_df is not None:
-        res_df = st.session_state.search_result_df
-        if res_df.empty:
-            st.warning("⚠️ No matching data found! Please try different filters.")
-        else:
-            st.success(st.session_state.success_msg)
-            hide_empty = st.checkbox("👁️ Hide columns with only 'None' or empty values", value=True)
-            display_df = res_df.copy()
-            if hide_empty:
-                display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA)
-                display_df = display_df.dropna(axis=1, how='all')
-                display_df = display_df.fillna('')
-            st.dataframe(display_df, hide_index=True, use_container_width=False)
-            
-            st.markdown("### 📥 Download Results")
-            dl_col1, dl_col2, _ = st.columns([1, 1, 2])
-            
-            def add_watermark(d_frame):
-                df_w = d_frame.copy()
-                df_w.loc[len(df_w)] = [""] * len(df_w.columns)
-                w_row = [""] * len(df_w.columns)
-                w_row[0] = "© Generated by LHS AI-Powered Dashboard - Created by Shib Prasad Ghosh"
-                df_w.loc[len(df_w)] = w_row
-                return df_w
-            
-            def safe_numeric(val):
-                if pd.isna(val) or val == "":
-                    return val
-                str_val = str(val).strip()
-                if str_val.startswith('0') and len(str_val) > 1 and str_val[1] != '.':
-                    return val
-                try:
-                    f_val = float(str_val)
-                    return int(f_val) if f_val.is_integer() else f_val
-                except (ValueError, TypeError):
-                    return val
-
-            file_time_str = datetime.now(IST).strftime('%Y%m%d_%I%M%S_%p')
-            csv_df = add_watermark(display_df)
-            csv = csv_df.to_csv(index=False).encode('utf-8')
-            dl_col1.download_button(
-                label="📄 Download as CSV",
-                data=csv,
-                file_name=f"LHS_Search_Result_{file_time_str}.csv",
-                mime="text/csv"
-            )
-            try:
-                excel_df = display_df.copy()
-                for col in excel_df.columns:
-                    excel_df[col] = excel_df[col].apply(safe_numeric)
-                excel_df = add_watermark(excel_df)
-                excel_buffer = io.BytesIO()
-                with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                    excel_df.to_excel(writer, index=False, sheet_name='Search_Result')
-                excel_data = excel_buffer.getvalue()
-                dl_col2.download_button(
-                    label="📊 Download as Excel",
-                    data=excel_data,
-                    file_name=f"LHS_Search_Result_{file_time_str}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            except ModuleNotFoundError:
-                dl_col2.warning("⚠️ Excel download requires 'openpyxl'. Please use CSV.")
-
-# ==========================================
-# --- FOOTER & ADMIN PANEL ---
-# ==========================================
-st.markdown("---")
-with st.expander("💡 Give Feedback / Suggestion for Improvement"):
-    st.write("We are constantly improving! Let us know what features you want next.")
-    with st.form("feedback_form"):
-        feedback_text = st.text_area("Your Suggestion / Feature Request:", placeholder="E.g. Please add a visual chart for weekly progress...")
-        submit_feedback = st.form_submit_button("Submit Suggestion")
-        if submit_feedback:
-            if feedback_text.strip():
-                log_time = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
-                uname = st.session_state.user_name.strip() if st.session_state.user_name.strip() else "Anonymous User"
-                with open("suggestions_log.txt", "a", encoding="utf-8") as sf:
-                    sf.write(f"[{log_time}] {uname}: {feedback_text.strip()}\n")
-                try:
-                    client = get_gspread_client()
-                    if client:
-                        sheet = client.open("LHS_App_Logs").worksheet("Suggestions")
-                        sheet.append_row([log_time, uname, feedback_text.strip()])
-                except Exception:
-                    pass
-                st.success("Thank you! Your suggestion has been successfully recorded. 🙏")
+                st.info("No search logs available yet locally. (Check Google Sheets if connected)")
+        with tab2:
+            if os.path.exists("suggestions_log.txt"):
+                with open("suggestions_log.txt", "r", encoding="utf-8") as sf:
+                    st.text_area("All Suggestions", sf.read(), height=250)
             else:
-                st.warning("Please write something before submitting.")
+                st.info("No suggestions received yet locally. (Check Google Sheets if connected)")
 
-st.markdown("---")
-if st.checkbox("⚙️ View Admin Panel (Logs & Suggestions)"):
-    tab1, tab2 = st.tabs(["📊 User Search Logs", "📝 Suggestions Received"])
-    with tab1:
-        if os.path.exists("visitor_log.csv"):
-            log_df = pd.read_csv("visitor_log.csv")
-            st.dataframe(log_df, use_container_width=True)
-            try:
-                log_buffer = io.BytesIO()
-                with pd.ExcelWriter(log_buffer, engine='openpyxl') as writer:
-                    log_df.to_excel(writer, index=False, sheet_name='Search_Logs')
-                st.download_button(
-                    label="📥 Download Search Logs as Excel",
-                    data=log_buffer.getvalue(),
-                    file_name=f"LHS_Visitor_Logs_{datetime.now(IST).strftime('%Y%m%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            except Exception as e:
-                st.error("Error generating Excel log file.")
-        else:
-            st.info("No search logs available yet locally. (Check Google Sheets if connected)")
-    with tab2:
-        if os.path.exists("suggestions_log.txt"):
-            with open("suggestions_log.txt", "r", encoding="utf-8") as sf:
-                st.text_area("All Suggestions", sf.read(), height=250)
-        else:
-            st.info("No suggestions received yet locally. (Check Google Sheets if connected)")
-
+# Watermark / Credit
 st.markdown(
     """
     <br><br>
