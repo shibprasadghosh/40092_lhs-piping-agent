@@ -66,38 +66,30 @@ else:
 # ==========================================
 # --- HEADER (FROZEN / STICKY AT TOP) ---
 # ==========================================
-# We use custom CSS and HTML to create a sticky header block
+# (Fixed Markdown Indentation Bug)
 sticky_header_html = f"""
 <style>
-/* Hide Streamlit default top padding for a cleaner look */
-.block-container {{
-    padding-top: 2rem !important;
-}}
+.block-container {{ padding-top: 2rem !important; }}
 .frozen-header {{
     position: sticky;
     top: 0;
     z-index: 999;
-    background-color: #0e1117; /* Matches Streamlit dark mode background so data slides under invisibly */
+    background-color: #0e1117;
     padding-top: 10px;
     padding-bottom: 15px;
     border-bottom: 1px solid #333;
     margin-bottom: 25px;
 }}
 </style>
-
 <div class="frozen-header">
-    <h1 style="color: white; margin-top: 0; font-size: 36px; padding-bottom: 10px;">🤖 LHS Project - AI Data Assistant</h1>
-    
-    <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-        <h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
-        <p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">
-            Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.
-        </p>
-    </div>
-    
-    <div style="background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3);">
-        📅 <b>Database Last Updated On:</b> {last_updated}
-    </div>
+<h1 style="color: white; margin-top: 0; font-size: 36px; padding-bottom: 10px;">🤖 LHS Project - AI Data Assistant</h1>
+<div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+<h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
+<p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
+</div>
+<div style="background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3);">
+📅 <b>Database Last Updated On:</b> {last_updated}
+</div>
 </div>
 """
 st.markdown(sticky_header_html, unsafe_allow_html=True)
