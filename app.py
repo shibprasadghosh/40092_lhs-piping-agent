@@ -67,33 +67,75 @@ else:
 # --- HEADER (FROZEN / STICKY AT TOP) ---
 # ==========================================
 
-# Database Update Box (Only generate if Logged In - Fixed Indentation Bug)
+# Database Update Box (Only generate if Logged In)
 db_update_html = ""
 if st.session_state.logged_in:
-    db_update_html = f"<div style='background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3); margin-top: 15px;'>📅 <b>Database Last Updated On:</b> {last_updated}</div>"
+    db_update_html = f"<div class='db-update-box'>📅 <b>Database Last Updated On:</b> {last_updated}</div>"
 
-# Sticky Header Construction
+# Sticky Header Construction with MAGIC CSS
 sticky_header_html = f"""
 <style>
-.block-container {{ padding-top: 2rem !important; }}
-.frozen-header {{
+/* Remove default padding to stick to the top nicely */
+.block-container {{ padding-top: 1rem !important; }}
+
+/* MAGIC CSS: Target the exact Streamlit wrapper and make it sticky */
+div[data-testid="stVerticalBlock"] > div:first-of-type {{
     position: sticky;
-    top: 0;
-    z-index: 999;
-    background-color: #0e1117;
-    padding-top: 10px;
+    top: 40px; /* Sits exactly below Streamlit's native right-side buttons */
+    z-index: 9999;
+    background-color: #0e1117; /* Matches Streamlit dark mode */
     padding-bottom: 15px;
     border-bottom: 1px solid #333;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
+}}
+
+.frozen-header h1 {{
+    color: white; 
+    margin-top: 0; 
+    font-size: 36px; 
+    padding-bottom: 10px;
+}}
+.frozen-banner {{
+    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); 
+    padding: 22px; 
+    border-radius: 12px; 
+    border-left: 6px solid #00d2ff; 
+    margin-bottom: 5px; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}}
+.frozen-banner h2 {{
+    color: #00d2ff; 
+    margin-top: 0; 
+    font-size: 26px; 
+    font-weight: bold; 
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}}
+.frozen-banner p {{
+    color: #e0e0e0; 
+    font-size: 22px; 
+    font-weight: 500; 
+    margin-bottom: 0; 
+    line-height: 1.6;
+}}
+.db-update-box {{
+    background-color: rgba(43, 123, 203, 0.15); 
+    padding: 12px 20px; 
+    border-radius: 8px; 
+    color: #8bbdff; 
+    font-family: sans-serif; 
+    font-size: 16px; 
+    border: 1px solid rgba(43, 123, 203, 0.3); 
+    margin-top: 15px;
 }}
 </style>
+
 <div class="frozen-header">
-<h1 style="color: white; margin-top: 0; font-size: 36px; padding-bottom: 10px;">🤖 LHS Project - AI Data Assistant</h1>
-<div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); padding: 22px; border-radius: 12px; border-left: 6px solid #00d2ff; margin-bottom: 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-<h2 style="color: #00d2ff; margin-top: 0; font-size: 26px; font-weight: bold; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">👋 Welcome, Dear Project Team! 🚀</h2>
-<p style="color: #e0e0e0; font-size: 22px; font-weight: 500; margin-bottom: 0; line-height: 1.6;">Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
-</div>
-{db_update_html}
+    <h1>🤖 LHS Project - AI Data Assistant</h1>
+    <div class="frozen-banner">
+        <h2>👋 Welcome, Dear Project Team! 🚀</h2>
+        <p>Experience the next-generation <b>AI Data Portal</b> for advanced filtering, seamless line tracing, and smart piping insights.</p>
+    </div>
+    {db_update_html}
 </div>
 """
 st.markdown(sticky_header_html, unsafe_allow_html=True)
