@@ -225,12 +225,10 @@ else:
                 st.session_state.wp_ai_query_input = "" 
 
         st.subheader("📊 Welding Progress & Analytics")
-        # Enalrged Instruction
         st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 15px;'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
 
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            # Enlarged Instruction
             st.markdown("<div style='font-size: 18px; font-weight: bold; color: #58a6ff;'>➕ Click '+' to add filter fields dynamically!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=wp_reset_dashboard, key="wp_reset")
@@ -257,14 +255,11 @@ else:
         st.button("➕ Add Another Filter Field", on_click=wp_add_filter_row, key="wp_add")
 
         st.markdown("---")
-        
-        # Enlarged Instruction for AI input
         st.markdown("<h3 style='margin-bottom: 5px; color: #ffffff;'>💬 Or Ask AI (Custom Question):</h3>", unsafe_allow_html=True)
         st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 10px;'>Enter your question here in your preferred language <b>(Leave blank if using filters above)</b>:</div>", unsafe_allow_html=True)
         
         wp_user_query = st.text_input("Hidden Label", key="wp_ai_query_input", label_visibility="collapsed")
 
-        # Colorized Primary Button
         if st.button("🚀 Calculate Progress & Search", type="primary"):
             if df.empty:
                 st.error("⚠️ No data file found. Please upload the Excel dataset first.")
@@ -291,11 +286,10 @@ else:
                                 final_res = None
                                 successful_model = ""
                                 
-                                # STRICTLY SELECT 'PRO' MODEL
-                                smart_models = [m for m in model_list if 'pro' in m.lower()]
-                                if not smart_models:
-                                    smart_models = model_list # Fallback only if no PRO exists
-                                ordered_models = list(dict.fromkeys(smart_models))
+                                # Priority: Pro then Flash
+                                smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower()]
+                                smart_models = list(dict.fromkeys(smart_models))
+                                ordered_models = smart_models
                                 
                                 prompt = f"""
                                 You are an expert data analyst working with a Pandas DataFrame named `df`.
@@ -304,7 +298,7 @@ else:
                                 CRITICAL RULES FOR SEARCHING:
                                 1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
                                 2. EXACT vs PARTIAL MATCHING: 
-                                   - For IDs/Numbers (like Line No, Joint No, Area), use EXACT matching: `df[df['column_name'].astype(str).str.strip().str.upper() == 'VAL']`
+                                   - For IDs/Numbers, use EXACT matching.
                                    - For Names, Contractors, Agencies, or text substrings (like 'PECO'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                                 
                                 User requested: "{active_query}"
@@ -337,6 +331,7 @@ else:
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
+        # --- PROGRESS CHART & TABLE RENDER ---
         if st.session_state.wp_search_result_df is not None:
             res_df = st.session_state.wp_search_result_df
             if res_df.empty:
@@ -345,7 +340,6 @@ else:
                 st.success(st.session_state.wp_success_msg)
                 
                 chart_df = res_df.copy()
-                
                 fw_col = next((c for c in chart_df.columns if 'F&W REPORT' in c.upper()), None)
                 if fw_col:
                     chart_df['W_Flag'] = chart_df[fw_col].apply(lambda val: str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A'])
@@ -358,13 +352,10 @@ else:
                 else:
                     chart_df['Dia_Numeric'] = 0
                 
-                # Exact calculation without rounding
                 total_joints = len(chart_df)
                 total_id = chart_df['Dia_Numeric'].sum()
-                
                 done_joints = chart_df['W_Flag'].sum()
                 done_id = chart_df.loc[chart_df['W_Flag'] == True, 'Dia_Numeric'].sum()
-                
                 pending_joints = total_joints - done_joints
                 pending_id = total_id - done_id
                 
@@ -390,9 +381,7 @@ else:
                 
                 st.markdown("### 📋 Filtered Joint List")
                 hide_empty = st.checkbox("👁️ Hide empty columns", value=True, key="wp_hide_col")
-                
                 display_df = prep_display_df(res_df)
-                
                 if hide_empty:
                     display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA).dropna(axis=1, how='all').fillna('')
                 st.dataframe(display_df, hide_index=True, use_container_width=False)
@@ -427,10 +416,8 @@ else:
                 st.session_state.ai_query_input = "" 
 
         st.subheader("🎯 Smart Dynamic Filters:")
-        
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            # Enlarged Instruction
             st.markdown("<div style='font-size: 18px; font-weight: bold; color: #58a6ff;'>➕ Click '+' to add filter fields. Options will dynamically update based on your selections!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
@@ -457,14 +444,11 @@ else:
         st.button("➕ Add Another Filter Field", on_click=add_filter_row)
 
         st.markdown("---")
-
-        # Enlarged Instruction for AI input
         st.markdown("<h3 style='margin-bottom: 5px; color: #ffffff;'>💬 Or Ask AI (Custom Question):</h3>", unsafe_allow_html=True)
         st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 10px;'>Enter your question here in your preferred language <b>(Leave blank if using filters above)</b>:</div>", unsafe_allow_html=True)
         
         user_query = st.text_input("Hidden Label", key="ai_query_input", label_visibility="collapsed")
 
-        # Colorized Primary Button
         if st.button("🔍 Search Database", type="primary"):
             if df.empty:
                 st.error("⚠️ No data file found. Please upload the Excel dataset first.")
@@ -476,9 +460,7 @@ else:
                 if active_conditions:
                     auto_query = "Find all rows where " + " and ".join(active_conditions) + ". Show all columns."
                     if active_query:
-                        active_query = auto_query + " Furthermore, apply this condition: " + active_query
-                    else:
-                        active_query = auto_query
+                        active_query = auto_query + " Furthermore, apply this condition: " + active_query if active_query else auto_query
 
                 if active_query:
                     if not model_list:
@@ -490,11 +472,10 @@ else:
                             final_res = None
                             successful_model = ""
                             
-                            # STRICTLY SELECT 'PRO' MODEL
-                            smart_models = [m for m in model_list if 'pro' in m.lower()]
-                            if not smart_models:
-                                smart_models = model_list # Fallback only if no PRO exists
-                            ordered_models = list(dict.fromkeys(smart_models))
+                            # Fallback logic restored: Pro first, then Flash
+                            smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower()]
+                            smart_models = list(dict.fromkeys(smart_models))
+                            ordered_models = smart_models
                             
                             prompt = f"""
                             You are an expert data analyst working with a Pandas DataFrame named `df`.
