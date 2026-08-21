@@ -133,7 +133,6 @@ else:
             return pd.DataFrame(), []
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
         df = pd.read_excel(current_file, sheet_name="Master_Data", dtype=str)
-        # Convert all string columns to upper case for consistency
         df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
         df = df.replace({'NAN': '', 'NAT': ''})
         
@@ -175,13 +174,10 @@ else:
         except Exception:
             pass 
 
-    # Helper function to clean display dataframe (Removes old serials, adds new dynamic one)
     def prep_display_df(d_frame):
         display_df = d_frame.copy()
-        # Drop any existing variations of Serial Number from the excel
         drop_cols = [c for c in display_df.columns if c.strip().upper() in ['SL. NO.', 'SL NO.', 'SL NO', 'SR NO', 'SR. NO.', 'SL.NO', 'SL. NO', 'SL.NO.']]
         display_df = display_df.drop(columns=drop_cols, errors='ignore')
-        # Insert fresh dynamic Sl. No. at position 0
         display_df.insert(0, 'Sl. No.', range(1, len(display_df) + 1))
         return display_df
 
@@ -245,7 +241,7 @@ else:
 
         st.markdown("---")
         st.subheader("💬 Or Ask AI (Custom Question):")
-        wp_user_query = st.text_input("Enter your question here (Leave blank if using filters above):", key="wp_ai_query_input")
+        wp_user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="wp_ai_query_input")
 
         if st.button("🚀 Calculate Progress & Search"):
             if df.empty:
@@ -283,7 +279,9 @@ else:
                                 
                                 CRITICAL RULES FOR SEARCHING:
                                 1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
-                                2. EXACT MATCHING: Use exact string matching logic to prevent partial bugs.
+                                2. EXACT vs PARTIAL MATCHING: 
+                                   - For IDs/Numbers (like Line No, Joint No, Area), use EXACT matching: `df[df['column_name'].astype(str).str.strip().str.upper() == 'VAL']`
+                                   - For Names, Contractors, Agencies, or text substrings (like 'PECO'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                                 
                                 User requested: "{active_query}"
                                 
@@ -315,7 +313,7 @@ else:
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
-        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC - DYNAMIC COLUMNS FIXED) ---
+        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC - 3 DECIMAL PLACES) ---
         if st.session_state.wp_search_result_df is not None:
             res_df = st.session_state.wp_search_result_df
             if res_df.empty:
@@ -325,21 +323,19 @@ else:
                 
                 chart_df = res_df.copy()
                 
-                # 1. SMART DYNAMIC COLUMN FINDER FOR F&W REPORT (Fixes the 0% bug)
                 fw_col = next((c for c in chart_df.columns if 'F&W REPORT' in c.upper()), None)
                 if fw_col:
                     chart_df['W_Flag'] = chart_df[fw_col].apply(lambda val: str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A'])
                 else:
                     chart_df['W_Flag'] = False
                 
-                # 2. SMART DYNAMIC COLUMN FINDER FOR DIA (IN) (Fixes the 0 ID bug)
                 dia_col = next((c for c in chart_df.columns if 'DIA' in c.upper()), None)
                 if dia_col:
                     chart_df['Dia_Numeric'] = pd.to_numeric(chart_df[dia_col], errors='coerce').fillna(0)
                 else:
                     chart_df['Dia_Numeric'] = 0
                 
-                # Calculate Scope & Done
+                # Exact calculation without rounding
                 total_joints = len(chart_df)
                 total_id = chart_df['Dia_Numeric'].sum()
                 
@@ -352,6 +348,7 @@ else:
                 progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
                 deg = int((progress_pct / 100) * 360)
                 
+                # FIXED: Changed :.2f to :.3f to show exact 3 decimal places
                 css_donut_html = f"""
                 <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
                     <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
@@ -361,9 +358,9 @@ else:
                     </div>
                     <div>
                         <h3 style="margin-top: 0; color: #58a6ff; font-size: 24px;">Welding Progress (Inch Dia Basis)</h3>
-                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> {done_joints} Joints ({done_id:g} ID)</div>
-                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> {pending_joints} Joints ({pending_id:g} ID)</div>
-                        <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_joints} Joints ({total_id:g} ID)</b></div>
+                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> {done_joints} Joints ({done_id:.3f} ID)</div>
+                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> {pending_joints} Joints ({pending_id:.3f} ID)</div>
+                        <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_joints} Joints ({total_id:.3f} ID)</b></div>
                     </div>
                 </div>
                 """
@@ -372,7 +369,6 @@ else:
                 st.markdown("### 📋 Filtered Joint List")
                 hide_empty = st.checkbox("👁️ Hide empty columns", value=True, key="wp_hide_col")
                 
-                # Apply the table cleanup logic (fixes Sl. No. bug)
                 display_df = prep_display_df(res_df)
                 
                 if hide_empty:
@@ -476,8 +472,9 @@ else:
                             
                             CRITICAL RULES FOR SEARCHING:
                             1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
-                            2. PREVENT PARTIAL MATCH BUGS: When searching for an ID containing numbers, you MUST NOT use `.str.contains()`. You MUST use exact matching.
-                            - CORRECT EXACT MATCH LOGIC: `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
+                            2. EXACT vs PARTIAL MATCHING: 
+                               - For IDs/Numbers (like Line No, Joint No, Area), use EXACT matching: `df[df['column_name'].astype(str).str.strip().str.upper() == 'VAL']`
+                               - For Names, Contractors, Agencies, or text substrings (like 'PECO'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                             3. Identify the most logical column name based on context.
                             
                             User requested: "{active_query}"
@@ -518,7 +515,6 @@ else:
                 st.success(st.session_state.success_msg)
                 hide_empty = st.checkbox("👁️ Hide columns with only 'None' or empty values", value=True)
                 
-                # Apply the table cleanup logic (fixes Sl. No. bug on this page too)
                 display_df = prep_display_df(res_df)
                 
                 if hide_empty:
