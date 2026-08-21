@@ -64,16 +64,13 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- HEADER (THE REAL FREEZE FIX) ---
+# --- HEADER (PERFECTLY FROZEN & BUG FREE) ---
 # ==========================================
 
-# Database Update Box HTML (Only generated if Logged In)
 db_update_html = ""
 if st.session_state.logged_in:
     db_update_html = f"<div style='background-color: rgba(43, 123, 203, 0.15); padding: 12px 20px; border-radius: 8px; color: #8bbdff; font-family: sans-serif; font-size: 16px; border: 1px solid rgba(43, 123, 203, 0.3); margin-top: 15px;'>📅 <b>Database Last Updated On:</b> {last_updated}</div>"
 
-# Notice the specific ID 'my-frozen-header' added here. 
-# We will use CSS to find Streamlit's container that holds this ID and freeze IT.
 sticky_header_html = f"""
 <div id="my-frozen-header">
     <h1 style="color: white; margin: 0; padding-bottom: 15px; font-size: 36px;">🤖 LHS Project - AI Data Assistant</h1>
@@ -85,16 +82,13 @@ sticky_header_html = f"""
 </div>
 
 <style>
-/* 1. Remove Streamlit's default top gap */
 .block-container {{ padding-top: 1rem !important; }}
-
-/* 2. THE MASTER LOGIC: Find the exact Streamlit wrapper holding our ID and freeze it */
 div.element-container:has(#my-frozen-header) {{
     position: -webkit-sticky;
     position: sticky;
-    top: 2.875rem; /* Sits right under Streamlit's default top menu */
+    top: 2.875rem; 
     z-index: 999999;
-    background-color: #0e1117; /* Solid background to stop overlap */
+    background-color: #0e1117; 
     padding-bottom: 15px;
     border-bottom: 2px solid #2c333f;
     margin-bottom: 15px;
@@ -108,13 +102,11 @@ st.markdown(sticky_header_html, unsafe_allow_html=True)
 # --- GATEKEEPER / AUTHENTICATION LOGIC ---
 # ==========================================
 if not st.session_state.logged_in:
-    # If not logged in, show ONLY the lock screen
     st.markdown("### 🔒 Dashboard is Locked")
     st.warning("Please enter your Name or Emp ID below and press **'Enter'** to unlock the dashboard.")
     
     col_auth1, col_auth2 = st.columns([1, 2])
     with col_auth1:
-        # Changed to Shib Prasad Ghosh as requested
         st.text_input("Enter Your Name / Emp ID:", key="auth_input", on_change=handle_login, placeholder="E.g. Shib Prasad Ghosh")
     with col_auth2:
         st.markdown("<div style='margin-top: 35px; color: gray; font-size: 14px;'>⚠️ Your ID is securely logged for tracking database queries.</div>", unsafe_allow_html=True)
@@ -135,7 +127,6 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.caption("© Created by Shib Prasad Ghosh")
 
-    # Load Data & Models
     @st.cache_resource
     def load_data_and_models(current_file):
         if not current_file:
@@ -167,7 +158,6 @@ else:
 
     df, model_list = load_data_and_models(file_name)
 
-    # Logging Logic
     def log_visitor(name, query_text):
         timestamp = datetime.now(IST).strftime("%Y-%m-%d %I:%M:%S %p")
         file_exists = os.path.isfile("visitor_log.csv")
@@ -184,26 +174,200 @@ else:
         except Exception:
             pass 
 
-    # --- MENU ROUTING ---
+    # ==========================================
+    # --- MENU 1: WELDING PROGRESS TRACKING ---
+    # ==========================================
     if menu_selection == "📊 Welding Progress Tracking":
-        st.subheader("📈 Welding Progress Dashboard")
+        if 'wp_filter_ids' not in st.session_state:
+            st.session_state.wp_filter_ids = []
+        if 'wp_next_id' not in st.session_state:
+            st.session_state.wp_next_id = 0
+        if 'wp_search_result_df' not in st.session_state:
+            st.session_state.wp_search_result_df = None
+        if 'wp_success_msg' not in st.session_state:
+            st.session_state.wp_success_msg = ""
+
+        def wp_add_filter_row():
+            st.session_state.wp_filter_ids.append(st.session_state.wp_next_id)
+            st.session_state.wp_next_id += 1
+
+        def wp_remove_filter_row(fid):
+            st.session_state.wp_filter_ids.remove(fid)
+
+        def wp_reset_dashboard():
+            st.session_state.wp_filter_ids = []
+            st.session_state.wp_next_id = 0
+            st.session_state.wp_search_result_df = None
+            st.session_state.wp_success_msg = ""
+            if 'wp_ai_query_input' in st.session_state:
+                st.session_state.wp_ai_query_input = "" 
+
+        st.subheader("📊 Welding Progress & Analytics")
+        st.write("Use smart filters or Ask AI to generate a precise visual progress chart based on Inch Dia (ID).")
+
+        col_f_title, col_f_btn = st.columns([4, 1])
+        with col_f_title:
+            st.write("Click '+' to add filter fields dynamically!")
+        with col_f_btn:
+            st.button("🔄 Reset / Refresh", on_click=wp_reset_dashboard, key="wp_reset")
+
+        wp_active_conditions = []
+        wp_progressive_df = df.copy() if not df.empty else pd.DataFrame()
+
         if not df.empty:
-            def check_welding(row):
-                val = str(row.get('F&W REPORT', '')).strip().upper()
-                return val != '' and val != 'NAN' and val != 'NONE' and val != 'N/A'
+            for i, fid in enumerate(st.session_state.wp_filter_ids):
+                col1, col2, col3 = st.columns([4, 4, 1])
+                chosen_col = col1.selectbox(f"Filter Field {i+1}", ["(Select a Column)"] + list(df.columns), key=f"wp_col_{fid}")
+                if chosen_col != "(Select a Column)":
+                    raw_vals = [str(val).strip() for val in wp_progressive_df[chosen_col].unique() if str(val).strip() != '']
+                    unique_vals = ["(Select a Value)"] + sorted(list(set(raw_vals)))
+                    chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"wp_val_{fid}")
+                    if chosen_val != "(Select a Value)":
+                        wp_active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
+                        wp_progressive_df = wp_progressive_df[wp_progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+                
+                with col3:
+                    st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                    st.button("❌", key=f"wp_del_{fid}", on_click=wp_remove_filter_row, args=(fid,), help="Remove this filter")
 
-            df['Welding_Done'] = df.apply(check_welding, axis=1)
-            
-            summary = df.groupby(['AREA', 'LINE NO.']).agg(
-                Welding_Scope=('JOINT NO.', 'count'),
-                Welding_Done=('Welding_Done', 'sum')
-            ).reset_index()
-            
-            summary['Welding_%'] = ((summary['Welding_Done'] / summary['Welding_Scope']) * 100).round(1)
-            st.dataframe(summary, use_container_width=True)
-        else:
-            st.warning("No data found!")
+        st.button("➕ Add Another Filter Field", on_click=wp_add_filter_row, key="wp_add")
 
+        st.markdown("---")
+        st.subheader("💬 Or Ask AI (Custom Question):")
+        wp_user_query = st.text_input("Enter your question here (Leave blank if using filters above):", key="wp_ai_query_input")
+
+        if st.button("🚀 Calculate Progress & Search"):
+            if df.empty:
+                st.error("⚠️ No data file found. Please upload the Excel dataset first.")
+            else:
+                active_query = wp_user_query.strip()
+                log_entry = active_query if active_query else f"[Welding Progress Filters: {', '.join(wp_active_conditions)}]"
+                
+                if wp_active_conditions:
+                    auto_query = "Find all rows where " + " and ".join(wp_active_conditions) + ". Show all columns."
+                    active_query = auto_query + " Furthermore, apply this condition: " + active_query if active_query else auto_query
+
+                if active_query:
+                    if not wp_user_query.strip() and wp_active_conditions:
+                        st.session_state.wp_search_result_df = wp_progressive_df
+                        st.session_state.wp_success_msg = "✅ Success! (Filtered from Data)"
+                        log_visitor(st.session_state.user_name.strip(), log_entry)
+                    else:
+                        if not model_list:
+                            st.error("Error: No valid text models found for this API Key.")
+                        else:
+                            log_visitor(st.session_state.user_name.strip(), log_entry)
+                            with st.spinner("Analyzing data for progress report... 🕵️‍♂️"):
+                                success = False
+                                final_res = None
+                                successful_model = ""
+                                
+                                smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
+                                smart_models = smart_models if smart_models else model_list
+                                ordered_models = list(dict.fromkeys(smart_models))
+                                
+                                prompt = f"""
+                                You are an expert data analyst working with a Pandas DataFrame named `df`.
+                                The columns of the dataframe are: {list(df.columns)}
+                                
+                                CRITICAL RULES FOR SEARCHING:
+                                1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
+                                2. EXACT MATCHING: Use exact string matching logic to prevent partial bugs.
+                                
+                                User requested: "{active_query}"
+                                
+                                Write ONLY executable Python code using pandas. Store the final result in a variable named `result`.
+                                """
+                                
+                                for m_name in ordered_models:
+                                    try:
+                                        model = genai.GenerativeModel(m_name)
+                                        response = model.generate_content(prompt)
+                                        bt = chr(96) * 3
+                                        code = response.text.replace(bt + "python", "").replace(bt, "").strip()
+                                        local_vars = {"df": df, "pd": pd}
+                                        exec(code, {}, local_vars)
+                                        final_res = local_vars.get("result", None)
+                                        successful_model = m_name
+                                        success = True
+                                        break 
+                                    except Exception:
+                                        continue 
+                                
+                                if success and isinstance(final_res, pd.DataFrame):
+                                    st.session_state.wp_search_result_df = final_res
+                                    st.session_state.wp_success_msg = f"✅ Success! (Powered by {successful_model})"
+                                else:
+                                    st.session_state.wp_search_result_df = None
+                                    st.session_state.wp_success_msg = ""
+                                    st.error("❌ No matching data found or API error.")
+                else:
+                    st.warning("Please enter a question or select at least one filter first to calculate progress!")
+
+        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC) ---
+        if st.session_state.wp_search_result_df is not None:
+            res_df = st.session_state.wp_search_result_df
+            if res_df.empty:
+                st.warning("⚠️ No matching data found! Please try different filters.")
+            else:
+                st.success(st.session_state.wp_success_msg)
+                
+                def check_weld(val):
+                    v = str(val).strip().upper()
+                    return v not in ['', 'NAN', 'NONE', 'N/A']
+                
+                chart_df = res_df.copy()
+                chart_df['W_Flag'] = chart_df.get('F&W REPORT', pd.Series(['']*len(chart_df))).apply(check_weld)
+                
+                # Convert 'Dia (IN)' to numeric for ID calculation
+                if 'Dia (IN)' in chart_df.columns:
+                    chart_df['Dia_Numeric'] = pd.to_numeric(chart_df['Dia (IN)'], errors='coerce').fillna(0)
+                else:
+                    chart_df['Dia_Numeric'] = 0
+                
+                # Calculate Scope & Done (Joints and Inch Dia)
+                total_joints = len(chart_df)
+                total_id = chart_df['Dia_Numeric'].sum()
+                
+                done_joints = chart_df['W_Flag'].sum()
+                done_id = chart_df.loc[chart_df['W_Flag'], 'Dia_Numeric'].sum()
+                
+                pending_joints = total_joints - done_joints
+                pending_id = total_id - done_id
+                
+                # Progress Percentage based on Inch Dia (ID)
+                progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
+                deg = int((progress_pct / 100) * 360)
+                
+                # HTML/CSS Donut Chart
+                css_donut_html = f"""
+                <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
+                    <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
+                        <div style="width: 115px; height: 115px; border-radius: 50%; background-color: #161b22; display: flex; justify-content: center; align-items: center;">
+                            <h2 style="color: white; margin: 0; font-size: 28px;">{progress_pct}%</h2>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="margin-top: 0; color: #58a6ff; font-size: 24px;">Welding Progress (Inch Dia Basis)</h3>
+                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> {done_joints} Joints ({done_id:g} ID)</div>
+                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> {pending_joints} Joints ({pending_id:g} ID)</div>
+                        <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_joints} Joints ({total_id:g} ID)</b></div>
+                    </div>
+                </div>
+                """
+                st.markdown(css_donut_html, unsafe_allow_html=True)
+                
+                st.markdown("### 📋 Filtered Joint List")
+                hide_empty = st.checkbox("👁️ Hide empty columns", value=True, key="wp_hide_col")
+                display_df = res_df.copy()
+                if hide_empty:
+                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA).dropna(axis=1, how='all').fillna('')
+                st.dataframe(display_df, hide_index=True, use_container_width=False)
+
+
+    # ==========================================
+    # --- MENU 2: SMART SEARCH & FILTERS ---
+    # ==========================================
     elif menu_selection == "🎯 Smart Search & Filters":
         if 'filter_ids' not in st.session_state:
             st.session_state.filter_ids = []
@@ -286,12 +450,9 @@ else:
                             success = False
                             final_res = None
                             successful_model = ""
-                            error_logs = []
                             
-                            smart_models = [m for m in model_list if 'pro' in m.lower()] + \
-                                           [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
-                            if not smart_models:
-                                smart_models = model_list
+                            smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
+                            smart_models = smart_models if smart_models else model_list
                             ordered_models = list(dict.fromkeys(smart_models))
                             
                             prompt = f"""
@@ -299,14 +460,12 @@ else:
                             The columns of the dataframe are: {list(df.columns)}
                             
                             CRITICAL RULES FOR SEARCHING:
-                            1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
-                            2. PREVENT PARTIAL MATCH BUGS: When searching for an ID containing numbers, you MUST NOT use `.str.contains()`. You MUST use exact matching.
-                            - CORRECT EXACT MATCH LOGIC: `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
-                            3. Identify the most logical column name based on context.
+                            1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
+                            2. EXACT MATCHING: Use `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
                             
                             User requested: "{active_query}"
                             
-                            Write ONLY executable Python code using pandas. Store the final result in a variable named `result`. Do not include any markdown formatting like python in your response.
+                            Write ONLY executable Python code using pandas. Store the final result in a variable named `result`.
                             """
                             
                             for m_name in ordered_models:
@@ -317,12 +476,11 @@ else:
                                     code = response.text.replace(bt + "python", "").replace(bt, "").strip()
                                     local_vars = {"df": df, "pd": pd}
                                     exec(code, {}, local_vars)
-                                    final_res = local_vars.get("result", "No result variable found.")
+                                    final_res = local_vars.get("result", None)
                                     successful_model = m_name
                                     success = True
                                     break 
-                                except Exception as e:
-                                    error_logs.append(f"Failed with {m_name}: {str(e)}")
+                                except Exception:
                                     continue 
                             
                             if success and isinstance(final_res, pd.DataFrame):
@@ -344,9 +502,7 @@ else:
                 hide_empty = st.checkbox("👁️ Hide columns with only 'None' or empty values", value=True)
                 display_df = res_df.copy()
                 if hide_empty:
-                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA)
-                    display_df = display_df.dropna(axis=1, how='all')
-                    display_df = display_df.fillna('')
+                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA).dropna(axis=1, how='all').fillna('')
                 st.dataframe(display_df, hide_index=True, use_container_width=False)
                 
                 st.markdown("### 📥 Download Results")
@@ -399,7 +555,7 @@ else:
                 except ModuleNotFoundError:
                     dl_col2.warning("⚠️ Excel download requires 'openpyxl'. Please use CSV.")
 
-    # --- FOOTER & ADMIN PANEL (Only visible if logged in) ---
+    # --- FOOTER & ADMIN PANEL ---
     st.markdown("---")
     with st.expander("💡 Give Feedback / Suggestion for Improvement"):
         st.write("We are constantly improving! Let us know what features you want next.")
@@ -431,13 +587,13 @@ else:
                 log_df = pd.read_csv("visitor_log.csv")
                 st.dataframe(log_df, use_container_width=True)
             else:
-                st.info("No search logs available yet locally. (Check Google Sheets if connected)")
+                st.info("No search logs available yet locally.")
         with tab2:
             if os.path.exists("suggestions_log.txt"):
                 with open("suggestions_log.txt", "r", encoding="utf-8") as sf:
                     st.text_area("All Suggestions", sf.read(), height=250)
             else:
-                st.info("No suggestions received yet locally. (Check Google Sheets if connected)")
+                st.info("No suggestions received yet locally.")
 
 # Watermark / Credit
 st.markdown(
