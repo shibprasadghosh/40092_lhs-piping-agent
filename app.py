@@ -304,7 +304,7 @@ else:
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
-        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC) ---
+        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC - BUG FIXED) ---
         if st.session_state.wp_search_result_df is not None:
             res_df = st.session_state.wp_search_result_df
             if res_df.empty:
@@ -317,7 +317,12 @@ else:
                     return v not in ['', 'NAN', 'NONE', 'N/A']
                 
                 chart_df = res_df.copy()
-                chart_df['W_Flag'] = chart_df.get('F&W REPORT', pd.Series(['']*len(chart_df))).apply(check_weld)
+                
+                # Foolproof W_Flag calculation
+                if 'F&W REPORT' in chart_df.columns:
+                    chart_df['W_Flag'] = chart_df['F&W REPORT'].apply(check_weld)
+                else:
+                    chart_df['W_Flag'] = False
                 
                 # Convert 'Dia (IN)' to numeric for ID calculation
                 if 'Dia (IN)' in chart_df.columns:
@@ -330,7 +335,9 @@ else:
                 total_id = chart_df['Dia_Numeric'].sum()
                 
                 done_joints = chart_df['W_Flag'].sum()
-                done_id = chart_df.loc[chart_df['W_Flag'], 'Dia_Numeric'].sum()
+                
+                # Safe boolean indexing to prevent KeyError/ValueError
+                done_id = chart_df[chart_df['W_Flag'] == True]['Dia_Numeric'].sum()
                 
                 pending_joints = total_joints - done_joints
                 pending_id = total_id - done_id
@@ -460,12 +467,14 @@ else:
                             The columns of the dataframe are: {list(df.columns)}
                             
                             CRITICAL RULES FOR SEARCHING:
-                            1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
-                            2. EXACT MATCHING: Use `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
+                            1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
+                            2. PREVENT PARTIAL MATCH BUGS: When searching for an ID containing numbers, you MUST NOT use `.str.contains()`. You MUST use exact matching.
+                            - CORRECT EXACT MATCH LOGIC: `df[df['column_name'].astype(str).str.strip().str.upper() == 'Search_Term'.upper()]`
+                            3. Identify the most logical column name based on context.
                             
                             User requested: "{active_query}"
                             
-                            Write ONLY executable Python code using pandas. Store the final result in a variable named `result`.
+                            Write ONLY executable Python code using pandas. Store the final result in a variable named `result`. Do not include any markdown formatting like python in your response.
                             """
                             
                             for m_name in ordered_models:
@@ -476,11 +485,11 @@ else:
                                     code = response.text.replace(bt + "python", "").replace(bt, "").strip()
                                     local_vars = {"df": df, "pd": pd}
                                     exec(code, {}, local_vars)
-                                    final_res = local_vars.get("result", None)
+                                    final_res = local_vars.get("result", "No result variable found.")
                                     successful_model = m_name
                                     success = True
                                     break 
-                                except Exception:
+                                except Exception as e:
                                     continue 
                             
                             if success and isinstance(final_res, pd.DataFrame):
@@ -502,7 +511,9 @@ else:
                 hide_empty = st.checkbox("👁️ Hide columns with only 'None' or empty values", value=True)
                 display_df = res_df.copy()
                 if hide_empty:
-                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA).dropna(axis=1, how='all').fillna('')
+                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA)
+                    display_df = display_df.dropna(axis=1, how='all')
+                    display_df = display_df.fillna('')
                 st.dataframe(display_df, hide_index=True, use_container_width=False)
                 
                 st.markdown("### 📥 Download Results")
