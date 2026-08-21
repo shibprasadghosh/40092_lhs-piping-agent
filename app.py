@@ -291,8 +291,10 @@ else:
                                 final_res = None
                                 successful_model = ""
                                 
-                                smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
-                                smart_models = smart_models if smart_models else model_list
+                                # STRICTLY SELECT 'PRO' MODEL
+                                smart_models = [m for m in model_list if 'pro' in m.lower()]
+                                if not smart_models:
+                                    smart_models = model_list # Fallback only if no PRO exists
                                 ordered_models = list(dict.fromkeys(smart_models))
                                 
                                 prompt = f"""
@@ -488,8 +490,10 @@ else:
                             final_res = None
                             successful_model = ""
                             
-                            smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower() and 'lite' not in m.lower()]
-                            smart_models = smart_models if smart_models else model_list
+                            # STRICTLY SELECT 'PRO' MODEL
+                            smart_models = [m for m in model_list if 'pro' in m.lower()]
+                            if not smart_models:
+                                smart_models = model_list # Fallback only if no PRO exists
                             ordered_models = list(dict.fromkeys(smart_models))
                             
                             prompt = f"""
