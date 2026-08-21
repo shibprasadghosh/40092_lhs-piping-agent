@@ -64,7 +64,7 @@ else:
     last_updated = "No Data File Found! Please upload an Excel file."
 
 # ==========================================
-# --- HEADER (PERFECTLY FROZEN & BUG FREE) ---
+# --- HEADER & GLOBAL STYLES ---
 # ==========================================
 
 db_update_html = ""
@@ -92,6 +92,21 @@ div.element-container:has(#my-frozen-header) {{
     padding-bottom: 15px;
     border-bottom: 2px solid #2c333f;
     margin-bottom: 15px;
+}}
+/* Custom Styling for Primary Buttons */
+button[kind="primary"] {{
+    background: linear-gradient(135deg, #1e3c72, #2a5298) !important;
+    color: white !important;
+    border: 1px solid #58a6ff !important;
+    font-size: 18px !important;
+    font-weight: bold !important;
+    padding: 10px 24px !important;
+    border-radius: 8px !important;
+}}
+button[kind="primary"]:hover {{
+    background: linear-gradient(135deg, #2a5298, #1e3c72) !important;
+    border: 1px solid #00d2ff !important;
+    box-shadow: 0 4px 8px rgba(0, 210, 255, 0.3) !important;
 }}
 </style>
 """
@@ -210,11 +225,13 @@ else:
                 st.session_state.wp_ai_query_input = "" 
 
         st.subheader("📊 Welding Progress & Analytics")
-        st.write("Use smart filters or Ask AI to generate a precise visual progress chart based on Inch Dia (ID).")
+        # Enalrged Instruction
+        st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 15px;'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
 
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            st.write("Click '+' to add filter fields dynamically!")
+            # Enlarged Instruction
+            st.markdown("<div style='font-size: 18px; font-weight: bold; color: #58a6ff;'>➕ Click '+' to add filter fields dynamically!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=wp_reset_dashboard, key="wp_reset")
 
@@ -240,10 +257,15 @@ else:
         st.button("➕ Add Another Filter Field", on_click=wp_add_filter_row, key="wp_add")
 
         st.markdown("---")
-        st.subheader("💬 Or Ask AI (Custom Question):")
-        wp_user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="wp_ai_query_input")
+        
+        # Enlarged Instruction for AI input
+        st.markdown("<h3 style='margin-bottom: 5px; color: #ffffff;'>💬 Or Ask AI (Custom Question):</h3>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 10px;'>Enter your question here in your preferred language <b>(Leave blank if using filters above)</b>:</div>", unsafe_allow_html=True)
+        
+        wp_user_query = st.text_input("Hidden Label", key="wp_ai_query_input", label_visibility="collapsed")
 
-        if st.button("🚀 Calculate Progress & Search"):
+        # Colorized Primary Button
+        if st.button("🚀 Calculate Progress & Search", type="primary"):
             if df.empty:
                 st.error("⚠️ No data file found. Please upload the Excel dataset first.")
             else:
@@ -313,7 +335,6 @@ else:
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
-        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC - 3 DECIMAL PLACES) ---
         if st.session_state.wp_search_result_df is not None:
             res_df = st.session_state.wp_search_result_df
             if res_df.empty:
@@ -348,7 +369,6 @@ else:
                 progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
                 deg = int((progress_pct / 100) * 360)
                 
-                # FIXED: Changed :.2f to :.3f to show exact 3 decimal places
                 css_donut_html = f"""
                 <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
                     <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
@@ -405,9 +425,11 @@ else:
                 st.session_state.ai_query_input = "" 
 
         st.subheader("🎯 Smart Dynamic Filters:")
+        
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            st.write("Click '+' to add filter fields. Options will dynamically update based on your selections!")
+            # Enlarged Instruction
+            st.markdown("<div style='font-size: 18px; font-weight: bold; color: #58a6ff;'>➕ Click '+' to add filter fields. Options will dynamically update based on your selections!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
 
@@ -434,10 +456,14 @@ else:
 
         st.markdown("---")
 
-        st.subheader("💬 Or Ask AI (Custom Question):")
-        user_query = st.text_input("Enter your question here in your preferred language (Leave blank if using filters above):", key="ai_query_input")
+        # Enlarged Instruction for AI input
+        st.markdown("<h3 style='margin-bottom: 5px; color: #ffffff;'>💬 Or Ask AI (Custom Question):</h3>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 10px;'>Enter your question here in your preferred language <b>(Leave blank if using filters above)</b>:</div>", unsafe_allow_html=True)
+        
+        user_query = st.text_input("Hidden Label", key="ai_query_input", label_visibility="collapsed")
 
-        if st.button("Search Database"):
+        # Colorized Primary Button
+        if st.button("🔍 Search Database", type="primary"):
             if df.empty:
                 st.error("⚠️ No data file found. Please upload the Excel dataset first.")
             else:
