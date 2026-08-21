@@ -133,6 +133,7 @@ else:
             return pd.DataFrame(), []
         genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
         df = pd.read_excel(current_file, sheet_name="Master_Data", dtype=str)
+        # Convert all string columns to upper case for consistency
         df = df.apply(lambda x: x.str.strip().str.upper() if x.dtype == "object" else x)
         df = df.replace({'NAN': '', 'NAT': ''})
         
@@ -173,6 +174,16 @@ else:
                 sheet.append_row([timestamp, name, query_text])
         except Exception:
             pass 
+
+    # Helper function to clean display dataframe (Removes old serials, adds new dynamic one)
+    def prep_display_df(d_frame):
+        display_df = d_frame.copy()
+        # Drop any existing variations of Serial Number from the excel
+        drop_cols = [c for c in display_df.columns if c.strip().upper() in ['SL. NO.', 'SL NO.', 'SL NO', 'SR NO', 'SR. NO.', 'SL.NO', 'SL. NO', 'SL.NO.']]
+        display_df = display_df.drop(columns=drop_cols, errors='ignore')
+        # Insert fresh dynamic Sl. No. at position 0
+        display_df.insert(0, 'Sl. No.', range(1, len(display_df) + 1))
+        return display_df
 
     # ==========================================
     # --- MENU 1: WELDING PROGRESS TRACKING ---
@@ -304,7 +315,7 @@ else:
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
-        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC - BUG FIXED) ---
+        # --- PROGRESS CHART & TABLE RENDER (INCH DIA LOGIC - DYNAMIC COLUMNS FIXED) ---
         if st.session_state.wp_search_result_df is not None:
             res_df = st.session_state.wp_search_result_df
             if res_df.empty:
@@ -312,41 +323,35 @@ else:
             else:
                 st.success(st.session_state.wp_success_msg)
                 
-                def check_weld(val):
-                    v = str(val).strip().upper()
-                    return v not in ['', 'NAN', 'NONE', 'N/A']
-                
                 chart_df = res_df.copy()
                 
-                # Foolproof W_Flag calculation
-                if 'F&W REPORT' in chart_df.columns:
-                    chart_df['W_Flag'] = chart_df['F&W REPORT'].apply(check_weld)
+                # 1. SMART DYNAMIC COLUMN FINDER FOR F&W REPORT (Fixes the 0% bug)
+                fw_col = next((c for c in chart_df.columns if 'F&W REPORT' in c.upper()), None)
+                if fw_col:
+                    chart_df['W_Flag'] = chart_df[fw_col].apply(lambda val: str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A'])
                 else:
                     chart_df['W_Flag'] = False
                 
-                # Convert 'Dia (IN)' to numeric for ID calculation
-                if 'Dia (IN)' in chart_df.columns:
-                    chart_df['Dia_Numeric'] = pd.to_numeric(chart_df['Dia (IN)'], errors='coerce').fillna(0)
+                # 2. SMART DYNAMIC COLUMN FINDER FOR DIA (IN) (Fixes the 0 ID bug)
+                dia_col = next((c for c in chart_df.columns if 'DIA' in c.upper()), None)
+                if dia_col:
+                    chart_df['Dia_Numeric'] = pd.to_numeric(chart_df[dia_col], errors='coerce').fillna(0)
                 else:
                     chart_df['Dia_Numeric'] = 0
                 
-                # Calculate Scope & Done (Joints and Inch Dia)
+                # Calculate Scope & Done
                 total_joints = len(chart_df)
                 total_id = chart_df['Dia_Numeric'].sum()
                 
                 done_joints = chart_df['W_Flag'].sum()
-                
-                # Safe boolean indexing to prevent KeyError/ValueError
-                done_id = chart_df[chart_df['W_Flag'] == True]['Dia_Numeric'].sum()
+                done_id = chart_df.loc[chart_df['W_Flag'] == True, 'Dia_Numeric'].sum()
                 
                 pending_joints = total_joints - done_joints
                 pending_id = total_id - done_id
                 
-                # Progress Percentage based on Inch Dia (ID)
                 progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
                 deg = int((progress_pct / 100) * 360)
                 
-                # HTML/CSS Donut Chart
                 css_donut_html = f"""
                 <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
                     <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
@@ -366,7 +371,10 @@ else:
                 
                 st.markdown("### 📋 Filtered Joint List")
                 hide_empty = st.checkbox("👁️ Hide empty columns", value=True, key="wp_hide_col")
-                display_df = res_df.copy()
+                
+                # Apply the table cleanup logic (fixes Sl. No. bug)
+                display_df = prep_display_df(res_df)
+                
                 if hide_empty:
                     display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA).dropna(axis=1, how='all').fillna('')
                 st.dataframe(display_df, hide_index=True, use_container_width=False)
@@ -509,11 +517,12 @@ else:
             else:
                 st.success(st.session_state.success_msg)
                 hide_empty = st.checkbox("👁️ Hide columns with only 'None' or empty values", value=True)
-                display_df = res_df.copy()
+                
+                # Apply the table cleanup logic (fixes Sl. No. bug on this page too)
+                display_df = prep_display_df(res_df)
+                
                 if hide_empty:
-                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA)
-                    display_df = display_df.dropna(axis=1, how='all')
-                    display_df = display_df.fillna('')
+                    display_df = display_df.replace(['None', 'none', 'NAN', 'nan', ''], pd.NA).dropna(axis=1, how='all').fillna('')
                 st.dataframe(display_df, hide_index=True, use_container_width=False)
                 
                 st.markdown("### 📥 Download Results")
