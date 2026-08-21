@@ -9,7 +9,7 @@ import google.generativeai as genai
 import gspread
 from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="LHS Project AI Agent", layout="wide")
+st.set_page_config(page_title="LHS Project AI Agent", layout="wide", initial_sidebar_state="expanded")
 
 # --- Set Indian Standard Time (IST) ---
 IST = timezone(timedelta(hours=5, minutes=30))
