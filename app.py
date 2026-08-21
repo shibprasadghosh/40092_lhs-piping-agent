@@ -514,7 +514,7 @@ else:
                             else:
                                 st.session_state.search_result_df = None
                                 st.session_state.success_msg = ""
-                                st.error("❌ No matching data found or API error.")
+                                st.warning("⚠️ System is currently processing high-volume data requests. Please wait a moment or refresh to sync again.")
                 else:
                     st.warning("Please enter a question or select at least one filter first!")
 
