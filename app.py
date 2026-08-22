@@ -210,10 +210,9 @@ else:
     def is_valid_val(val):
         return pd.notna(val) and str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A']
         
-    # NEW STRICT FILTER FOR RT SCOPE
+    # STRICT FILTER FOR RT SCOPE
     def is_strict_valid_xr(val):
         str_val = str(val).strip().upper()
-        # Ensure it's not empty/NaN AND has at least 2 characters (e.g. "XR-123" or "10")
         return pd.notna(val) and str_val not in ['', 'NAN', 'NONE', 'N/A'] and len(str_val) >= 2
 
     # ==========================================
@@ -410,7 +409,7 @@ else:
                     st.markdown(css_donut_html, unsafe_allow_html=True)
 
                 # ---------------------------------------------------------
-                # RT PROGRESS LOGIC
+                # RT PROGRESS LOGIC (FINAL RESULT IGNORED ENTIRELY)
                 # ---------------------------------------------------------
                 else:
                     xr_col = next((c for c in chart_df.columns if 'XR NO' in c.upper() or 'RT NO' in c.upper()), None)
@@ -418,10 +417,9 @@ else:
                     r1_res_col = next((c for c in chart_df.columns if 'R1-RESULT' in c.upper() or 'R1 RESULT' in c.upper()), None)
                     r2_res_col = next((c for c in chart_df.columns if 'R2-RESULT' in c.upper() or 'R2 RESULT' in c.upper()), None)
                     r3_res_col = next((c for c in chart_df.columns if 'R3-RESULT' in c.upper() or 'R3 RESULT' in c.upper()), None)
-                    final_res_col = next((c for c in chart_df.columns if 'FINAL RESULT' in c.upper()), None)
                     
                     if xr_col:
-                        # SUPER STRICT LOGIC: This applies to EVERYTHING (Dropdowns & AI)
+                        # STRICT LOGIC: Only rows with a valid XR NO (>= 2 chars) are considered in RT Scope
                         rt_df = chart_df[chart_df[xr_col].apply(lambda x: is_strict_valid_xr(x))].copy()
                         
                         rt_total_joints = len(rt_df)
@@ -429,18 +427,24 @@ else:
                         
                         if rt_total_joints > 0:
                             def determine_rt_status(row):
-                                f_res = str(row.get(final_res_col, '')).strip().upper()
                                 r1_rep = str(row.get(r1_rep_col, '')).strip().upper()
                                 r1_res = str(row.get(r1_res_col, '')).strip().upper()
                                 r2_res = str(row.get(r2_res_col, '')).strip().upper()
                                 r3_res = str(row.get(r3_res_col, '')).strip().upper()
                                 
-                                if f_res == 'ACC':
+                                # 1. Check for ACC in R1, R2, or R3
+                                if 'ACC' in [r1_res, r2_res, r3_res]:
                                     return 'ACC'
-                                if not r1_rep or r1_rep in ['NAN', 'NONE', 'N/A']:
-                                    return 'PENDING'
+                                    
+                                # 2. Check for REP in R1, R2, or R3
                                 if 'REP' in r1_res or 'REP' in r2_res or 'REP' in r3_res:
                                     return 'REP'
+                                    
+                                # 3. Check for Pending (No R1 Report)
+                                if not r1_rep or r1_rep in ['NAN', 'NONE', 'N/A']:
+                                    return 'PENDING'
+                                    
+                                # 4. Default to Other
                                 return 'OTHER'
 
                             rt_df['RT_Status'] = rt_df.apply(determine_rt_status, axis=1)
