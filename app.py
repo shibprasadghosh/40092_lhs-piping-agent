@@ -88,9 +88,9 @@ div.element-container:has(#my-frozen-header) {{
     position: sticky;
     top: 2.875rem; 
     z-index: 999999;
-    background-color: #0e1117; /* FIXED: Restored solid dark background to prevent overlap */
+    background-color: var(--background-color); 
     padding-bottom: 15px;
-    border-bottom: 2px solid #2c333f;
+    border-bottom: 2px solid var(--secondary-background-color);
     margin-bottom: 15px;
 }}
 /* Custom Styling for Primary Buttons */
@@ -107,6 +107,11 @@ button[kind="primary"]:hover {{
     background: linear-gradient(135deg, #2a5298, #1e3c72) !important;
     border: 1px solid #00d2ff !important;
     box-shadow: 0 4px 8px rgba(0, 210, 255, 0.3) !important;
+}}
+/* Fix for light mode headers to use default text color */
+.theme-adaptive-text {{
+    font-size: 18px; 
+    margin-bottom: 15px;
 }}
 </style>
 """
@@ -225,12 +230,10 @@ else:
                 st.session_state.wp_ai_query_input = "" 
 
         st.subheader("📊 Welding Progress & Analytics")
-        # FIXED: Removed specific color so it adapts to Light/Dark mode automatically
-        st.markdown("<div style='font-size: 18px; margin-bottom: 15px;'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='theme-adaptive-text'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
 
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            # Blue color works fine on both light and dark mode, so keeping it
             st.markdown("<div style='font-size: 18px; font-weight: bold; color: #1e88e5;'>➕ Click '+' to add filter fields dynamically!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=wp_reset_dashboard, key="wp_reset")
@@ -259,10 +262,9 @@ else:
         st.markdown("---")
         
         st.subheader("💬 Or Ask AI (Custom Question):")
-        # FIXED: Removed specific color so it adapts automatically
-        st.markdown("<div style='font-size: 18px; margin-bottom: 10px;'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
-        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... ", key="wp_ai_query_input", label_visibility="collapsed")
+        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... e.g. SM contractor er progress ki?", key="wp_ai_query_input", label_visibility="collapsed")
 
         if st.button("🚀 Calculate Progress & Search", type="primary"):
             if df.empty:
@@ -290,7 +292,6 @@ else:
                                 final_res = None
                                 successful_model = ""
                                 
-                                # Priority: Pro then Flash
                                 smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower()]
                                 smart_models = list(dict.fromkeys(smart_models))
                                 ordered_models = smart_models
@@ -366,6 +367,7 @@ else:
                 progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
                 deg = int((progress_pct / 100) * 360)
                 
+                # FIXED: Reversed the display to show ID first, then Joints in brackets
                 css_donut_html = f"""
                 <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
                     <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
@@ -375,9 +377,9 @@ else:
                     </div>
                     <div>
                         <h3 style="margin-top: 0; color: #58a6ff; font-size: 24px;">Welding Progress (Inch Dia Basis)</h3>
-                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> {done_joints} Joints ({done_id:.3f} ID)</div>
-                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> {pending_joints} Joints ({pending_id:.3f} ID)</div>
-                        <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_joints} Joints ({total_id:.3f} ID)</b></div>
+                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> <b>{done_id:.3f} ID</b> ({done_joints} Joints)</div>
+                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> <b>{pending_id:.3f} ID</b> ({pending_joints} Joints)</div>
+                        <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_id:.3f} ID ({total_joints} Joints)</b></div>
                     </div>
                 </div>
                 """
@@ -450,8 +452,7 @@ else:
         st.markdown("---")
 
         st.subheader("💬 Or Ask AI (Custom Question):")
-        # FIXED: Removed specific color so it adapts automatically
-        st.markdown("<div style='font-size: 18px; margin-bottom: 10px;'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
         user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="ai_query_input", label_visibility="collapsed")
 
