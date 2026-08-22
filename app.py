@@ -209,6 +209,12 @@ else:
         
     def is_valid_val(val):
         return pd.notna(val) and str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A']
+        
+    # NEW STRICT FILTER FOR RT SCOPE
+    def is_strict_valid_xr(val):
+        str_val = str(val).strip().upper()
+        # Ensure it's not empty/NaN AND has at least 2 characters (e.g. "XR-123" or "10")
+        return pd.notna(val) and str_val not in ['', 'NAN', 'NONE', 'N/A'] and len(str_val) >= 2
 
     # ==========================================
     # --- MENU 1: WELDING & RT PROGRESS ---
@@ -278,7 +284,6 @@ else:
         st.subheader("💬 Or Ask AI (Custom Question):")
         st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
-        # FIXED: Removed the contractor name example, kept it clean and neutral
         wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="wp_ai_query_input", label_visibility="collapsed")
 
         if st.button("🚀 Calculate Progress & Search", type="primary"):
@@ -416,7 +421,8 @@ else:
                     final_res_col = next((c for c in chart_df.columns if 'FINAL RESULT' in c.upper()), None)
                     
                     if xr_col:
-                        rt_df = chart_df[chart_df[xr_col].apply(lambda x: is_valid_val(x))].copy()
+                        # STRICT LOGIC: Only rows with a valid XR NO (>= 2 chars) are considered in RT Scope
+                        rt_df = chart_df[chart_df[xr_col].apply(lambda x: is_strict_valid_xr(x))].copy()
                         
                         rt_total_joints = len(rt_df)
                         rt_total_id = rt_df['Dia_Numeric'].sum()
@@ -558,7 +564,6 @@ else:
         st.subheader("💬 Or Ask AI (Custom Question):")
         st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
-        # FIXED: Clean and neutral placeholder here too
         user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="ai_query_input", label_visibility="collapsed")
 
         if st.button("🔍 Search Database", type="primary"):
