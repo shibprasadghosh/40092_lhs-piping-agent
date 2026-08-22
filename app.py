@@ -113,6 +113,12 @@ button[kind="primary"]:hover {{
     font-size: 18px; 
     margin-bottom: 15px;
 }}
+/* Radio Button Styling */
+div[role="radiogroup"] label {{
+    font-size: 18px !important;
+    font-weight: bold !important;
+    cursor: pointer;
+}}
 </style>
 """
 st.markdown(sticky_header_html, unsafe_allow_html=True)
@@ -142,7 +148,7 @@ else:
     
     menu_selection = st.sidebar.radio(
         "Choose a Dashboard:",
-        ("🎯 Smart Search & Filters", "📊 Welding Progress Tracking")
+        ("🎯 Smart Search & Filters", "📊 Welding & RT Progress")
     )
     st.sidebar.markdown("---")
     st.sidebar.caption("© Created by Shib Prasad Ghosh")
@@ -200,11 +206,14 @@ else:
         display_df = display_df.drop(columns=drop_cols, errors='ignore')
         display_df.insert(0, 'Sl. No.', range(1, len(display_df) + 1))
         return display_df
+        
+    def is_valid_val(val):
+        return pd.notna(val) and str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A']
 
     # ==========================================
-    # --- MENU 1: WELDING PROGRESS TRACKING ---
+    # --- MENU 1: WELDING & RT PROGRESS ---
     # ==========================================
-    if menu_selection == "📊 Welding Progress Tracking":
+    if menu_selection == "📊 Welding & RT Progress":
         if 'wp_filter_ids' not in st.session_state:
             st.session_state.wp_filter_ids = []
         if 'wp_next_id' not in st.session_state:
@@ -229,7 +238,12 @@ else:
             if 'wp_ai_query_input' in st.session_state:
                 st.session_state.wp_ai_query_input = "" 
 
-        st.subheader("📊 Welding Progress & Analytics")
+        st.subheader("📊 Welding & RT Progress Analytics")
+        
+        # Dual Toggle Button for Welding or RT
+        prog_type = st.radio("📌 Select Progress Mode:", ["🔥 Welding Progress", "☢️ RT Progress"], horizontal=True)
+        st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
+        
         st.markdown("<div class='theme-adaptive-text'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
 
         col_f_title, col_f_btn = st.columns([4, 1])
@@ -271,7 +285,7 @@ else:
                 st.error("⚠️ No data file found. Please upload the Excel dataset first.")
             else:
                 active_query = wp_user_query.strip()
-                log_entry = active_query if active_query else f"[Welding Progress Filters: {', '.join(wp_active_conditions)}]"
+                log_entry = active_query if active_query else f"[Progress Filters: {', '.join(wp_active_conditions)}]"
                 
                 if wp_active_conditions:
                     auto_query = "Find all rows where " + " and ".join(wp_active_conditions) + ". Show all columns."
@@ -280,7 +294,7 @@ else:
                 if active_query:
                     if not wp_user_query.strip() and wp_active_conditions:
                         st.session_state.wp_search_result_df = wp_progressive_df
-                        st.session_state.wp_success_msg = "✅ Success! (Filtered from Data)"
+                        st.session_state.wp_success_msg = f"✅ Success! (Filtered from Data - {prog_type})"
                         log_visitor(st.session_state.user_name.strip(), log_entry)
                     else:
                         if not model_list:
@@ -304,7 +318,7 @@ else:
                                 1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
                                 2. EXACT vs PARTIAL MATCHING: 
                                    - For IDs/Numbers, use EXACT matching.
-                                   - For Names, Contractors, Agencies, or text substrings (like 'PECO', 'SM'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
+                                   - For Names, Contractors, Agencies, or text substrings, you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                                 
                                 User requested: "{active_query}"
                                 
@@ -328,7 +342,7 @@ else:
                                 
                                 if success and isinstance(final_res, pd.DataFrame):
                                     st.session_state.wp_search_result_df = final_res
-                                    st.session_state.wp_success_msg = f"✅ Success! (Powered by {successful_model})"
+                                    st.session_state.wp_success_msg = f"✅ Success! (Powered by {successful_model} - {prog_type})"
                                 else:
                                     st.session_state.wp_search_result_df = None
                                     st.session_state.wp_success_msg = ""
@@ -336,7 +350,7 @@ else:
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
-        # --- PROGRESS CHART & TABLE RENDER ---
+        # --- PROGRESS CHART RENDER ---
         if st.session_state.wp_search_result_df is not None:
             res_df = st.session_state.wp_search_result_df
             if res_df.empty:
@@ -345,45 +359,141 @@ else:
                 st.success(st.session_state.wp_success_msg)
                 
                 chart_df = res_df.copy()
-                fw_col = next((c for c in chart_df.columns if 'F&W REPORT' in c.upper()), None)
-                if fw_col:
-                    chart_df['W_Flag'] = chart_df[fw_col].apply(lambda val: str(val).strip().upper() not in ['', 'NAN', 'NONE', 'N/A'])
-                else:
-                    chart_df['W_Flag'] = False
                 
                 dia_col = next((c for c in chart_df.columns if 'DIA' in c.upper()), None)
                 if dia_col:
                     chart_df['Dia_Numeric'] = pd.to_numeric(chart_df[dia_col], errors='coerce').fillna(0)
                 else:
                     chart_df['Dia_Numeric'] = 0
-                
-                total_joints = len(chart_df)
-                total_id = chart_df['Dia_Numeric'].sum()
-                done_joints = chart_df['W_Flag'].sum()
-                done_id = chart_df.loc[chart_df['W_Flag'] == True, 'Dia_Numeric'].sum()
-                pending_joints = total_joints - done_joints
-                pending_id = total_id - done_id
-                
-                progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
-                deg = int((progress_pct / 100) * 360)
-                
-                # FIXED: Reversed the display to show ID first, then Joints in brackets
-                css_donut_html = f"""
-                <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
-                    <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
-                        <div style="width: 115px; height: 115px; border-radius: 50%; background-color: #161b22; display: flex; justify-content: center; align-items: center;">
-                            <h2 style="color: white; margin: 0; font-size: 28px;">{progress_pct}%</h2>
+
+                # ---------------------------------------------------------
+                # WELDING LOGIC
+                # ---------------------------------------------------------
+                if prog_type == "🔥 Welding Progress":
+                    fw_col = next((c for c in chart_df.columns if 'F&W REPORT' in c.upper()), None)
+                    if fw_col:
+                        chart_df['W_Flag'] = chart_df[fw_col].apply(lambda val: is_valid_val(val))
+                    else:
+                        chart_df['W_Flag'] = False
+                        
+                    total_joints = len(chart_df)
+                    total_id = chart_df['Dia_Numeric'].sum()
+                    done_joints = chart_df['W_Flag'].sum()
+                    done_id = chart_df.loc[chart_df['W_Flag'] == True, 'Dia_Numeric'].sum()
+                    pending_joints = total_joints - done_joints
+                    pending_id = total_id - done_id
+                    
+                    progress_pct = int((done_id / total_id) * 100) if total_id > 0 else 0
+                    deg = int((progress_pct / 100) * 360)
+                    
+                    css_donut_html = f"""
+                    <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
+                        <div style="width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(#28a745 {deg}deg, #dc3545 0deg); display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
+                            <div style="width: 115px; height: 115px; border-radius: 50%; background-color: #161b22; display: flex; justify-content: center; align-items: center;">
+                                <h2 style="color: white; margin: 0; font-size: 28px;">{progress_pct}%</h2>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 style="margin-top: 0; color: #58a6ff; font-size: 24px;">Welding Progress (Inch Dia Basis)</h3>
+                            <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> <b>{done_id:.3f} ID</b> ({done_joints} Joints)</div>
+                            <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> <b>{pending_id:.3f} ID</b> ({pending_joints} Joints)</div>
+                            <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_id:.3f} ID ({total_joints} Joints)</b></div>
                         </div>
                     </div>
-                    <div>
-                        <h3 style="margin-top: 0; color: #58a6ff; font-size: 24px;">Welding Progress (Inch Dia Basis)</h3>
-                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🟢 <span style="display:inline-block; width: 120px;"><b>Completed:</b></span> <b>{done_id:.3f} ID</b> ({done_joints} Joints)</div>
-                        <div style="font-size: 18px; color: #c9d1d9; margin-bottom: 8px;">🔴 <span style="display:inline-block; width: 120px;"><b>Pending:</b></span> <b>{pending_id:.3f} ID</b> ({pending_joints} Joints)</div>
-                        <div style="font-size: 18px; color: #ffffff; margin-top: 12px; border-top: 1px solid #30363d; padding-top: 12px;">📐 <span style="display:inline-block; width: 120px;"><b>Total Scope:</b></span> <b>{total_id:.3f} ID ({total_joints} Joints)</b></div>
-                    </div>
-                </div>
-                """
-                st.markdown(css_donut_html, unsafe_allow_html=True)
+                    """
+                    st.markdown(css_donut_html, unsafe_allow_html=True)
+
+                # ---------------------------------------------------------
+                # RT PROGRESS LOGIC (Advanced Algorithmic Logic)
+                # ---------------------------------------------------------
+                else:
+                    xr_col = next((c for c in chart_df.columns if 'XR NO' in c.upper() or 'RT NO' in c.upper()), None)
+                    r1_rep_col = next((c for c in chart_df.columns if 'R1 REPORT NO' in c.upper()), None)
+                    r1_res_col = next((c for c in chart_df.columns if 'R1-RESULT' in c.upper() or 'R1 RESULT' in c.upper()), None)
+                    r2_res_col = next((c for c in chart_df.columns if 'R2-RESULT' in c.upper() or 'R2 RESULT' in c.upper()), None)
+                    r3_res_col = next((c for c in chart_df.columns if 'R3-RESULT' in c.upper() or 'R3 RESULT' in c.upper()), None)
+                    final_res_col = next((c for c in chart_df.columns if 'FINAL RESULT' in c.upper()), None)
+                    
+                    if xr_col:
+                        # Step 1: Filter to only rows that have an XR NO. (This is the RT Scope)
+                        rt_df = chart_df[chart_df[xr_col].apply(lambda x: is_valid_val(x))].copy()
+                        
+                        rt_total_joints = len(rt_df)
+                        rt_total_id = rt_df['Dia_Numeric'].sum()
+                        
+                        if rt_total_joints > 0:
+                            def determine_rt_status(row):
+                                f_res = str(row.get(final_res_col, '')).strip().upper()
+                                r1_rep = str(row.get(r1_rep_col, '')).strip().upper()
+                                r1_res = str(row.get(r1_res_col, '')).strip().upper()
+                                r2_res = str(row.get(r2_res_col, '')).strip().upper()
+                                r3_res = str(row.get(r3_res_col, '')).strip().upper()
+                                
+                                # 2. Accepted (ACC)
+                                if f_res == 'ACC':
+                                    return 'ACC'
+                                # 3. Pending
+                                if not r1_rep or r1_rep in ['NAN', 'NONE', 'N/A']:
+                                    return 'PENDING'
+                                # 4. Repair (REP)
+                                if 'REP' in r1_res or 'REP' in r2_res or 'REP' in r3_res:
+                                    return 'REP'
+                                # 5. Other than REP (Minor Obs)
+                                return 'OTHER'
+
+                            rt_df['RT_Status'] = rt_df.apply(determine_rt_status, axis=1)
+                            
+                            acc_mask = rt_df['RT_Status'] == 'ACC'
+                            pending_mask = rt_df['RT_Status'] == 'PENDING'
+                            rep_mask = rt_df['RT_Status'] == 'REP'
+                            other_mask = rt_df['RT_Status'] == 'OTHER'
+                            
+                            acc_id = rt_df.loc[acc_mask, 'Dia_Numeric'].sum()
+                            pending_id = rt_df.loc[pending_mask, 'Dia_Numeric'].sum()
+                            rep_id = rt_df.loc[rep_mask, 'Dia_Numeric'].sum()
+                            other_id = rt_df.loc[other_mask, 'Dia_Numeric'].sum()
+                            
+                            acc_joints = acc_mask.sum()
+                            pending_joints = pending_mask.sum()
+                            rep_joints = rep_mask.sum()
+                            other_joints = other_mask.sum()
+                            
+                            acc_pct = int((acc_id / rt_total_id) * 100) if rt_total_id > 0 else 0
+                            
+                            # Calculate degrees for a 4-part donut chart
+                            deg_acc = (acc_id / rt_total_id) * 360 if rt_total_id > 0 else 0
+                            deg_pending = (pending_id / rt_total_id) * 360 if rt_total_id > 0 else 0
+                            deg_rep = (rep_id / rt_total_id) * 360 if rt_total_id > 0 else 0
+                            deg_other = (other_id / rt_total_id) * 360 if rt_total_id > 0 else 0
+                            
+                            # Conic Gradient logic (Green, Gray, Red, Orange)
+                            grad = f"conic-gradient(#28a745 0deg {deg_acc}deg, #6c757d {deg_acc}deg {deg_acc + deg_pending}deg, #dc3545 {deg_acc + deg_pending}deg {deg_acc + deg_pending + deg_rep}deg, #fd7e14 {deg_acc + deg_pending + deg_rep}deg 360deg)"
+                            
+                            css_rt_donut_html = f"""
+                            <div style="display: flex; flex-wrap: wrap; gap: 40px; align-items: center; background-color: #161b22; padding: 25px; border-radius: 12px; border: 1px solid #30363d; margin-top: 20px; margin-bottom: 25px;">
+                                <div style="width: 170px; height: 170px; border-radius: 50%; background: {grad}; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.4);">
+                                    <div style="width: 125px; height: 125px; border-radius: 50%; background-color: #161b22; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+                                        <h2 style="color: white; margin: 0; font-size: 26px;">{acc_pct}%</h2>
+                                        <span style="color: #28a745; font-size: 12px; font-weight: bold;">ACC</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 style="margin-top: 0; color: #58a6ff; font-size: 24px;">RT Progress (Inch Dia Basis)</h3>
+                                    <table style="width:100%; border: none; font-size: 17px; color: #c9d1d9;">
+                                        <tr><td style="padding: 4px 0;">🟢 <b>Accepted (ACC):</b></td> <td style="text-align: right;"><b>{acc_id:.3f} ID</b> ({acc_joints} Joints)</td></tr>
+                                        <tr><td style="padding: 4px 0;">⚪ <b>Pending (No R1):</b></td> <td style="text-align: right;"><b>{pending_id:.3f} ID</b> ({pending_joints} Joints)</td></tr>
+                                        <tr><td style="padding: 4px 0;">🔴 <b>Repair (REP):</b></td> <td style="text-align: right;"><b>{rep_id:.3f} ID</b> ({rep_joints} Joints)</td></tr>
+                                        <tr><td style="padding: 4px 0;">🟠 <b>Other (Minor Obs):</b></td> <td style="text-align: right;"><b>{other_id:.3f} ID</b> ({other_joints} Joints)</td></tr>
+                                    </table>
+                                    <div style="font-size: 18px; color: #ffffff; margin-top: 10px; border-top: 1px solid #30363d; padding-top: 10px;">📐 <b>Total RT Scope: {rt_total_id:.3f} ID ({rt_total_joints} Joints)</b></div>
+                                </div>
+                            </div>
+                            """
+                            st.markdown(css_rt_donut_html, unsafe_allow_html=True)
+                        else:
+                            st.warning("⚠️ No valid RT Scope (XR NO.) found in the filtered data.")
+                    else:
+                        st.error("⚠️ XR NO. column not found in dataset. Cannot calculate RT Progress.")
                 
                 st.markdown("### 📋 Filtered Joint List")
                 hide_empty = st.checkbox("👁️ Hide empty columns", value=True, key="wp_hide_col")
