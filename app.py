@@ -88,9 +88,9 @@ div.element-container:has(#my-frozen-header) {{
     position: sticky;
     top: 2.875rem; 
     z-index: 999999;
-    background-color: var(--background-color); 
+    background-color: #0e1117; /* FIXED: Restored solid dark background to prevent overlap */
     padding-bottom: 15px;
-    border-bottom: 2px solid var(--secondary-background-color);
+    border-bottom: 2px solid #2c333f;
     margin-bottom: 15px;
 }}
 /* Custom Styling for Primary Buttons */
@@ -107,11 +107,6 @@ button[kind="primary"]:hover {{
     background: linear-gradient(135deg, #2a5298, #1e3c72) !important;
     border: 1px solid #00d2ff !important;
     box-shadow: 0 4px 8px rgba(0, 210, 255, 0.3) !important;
-}}
-/* Fix for light mode headers to use default text color */
-.theme-adaptive-text {{
-    font-size: 18px; 
-    margin-bottom: 15px;
 }}
 </style>
 """
@@ -230,12 +225,13 @@ else:
                 st.session_state.wp_ai_query_input = "" 
 
         st.subheader("📊 Welding Progress & Analytics")
-        # Removed hardcoded white color, let Streamlit handle light/dark mode text color
-        st.markdown("<div class='theme-adaptive-text'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
+        # FIXED: Removed specific color so it adapts to Light/Dark mode automatically
+        st.markdown("<div style='font-size: 18px; margin-bottom: 15px;'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
 
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            st.markdown("<div style='font-size: 18px; font-weight: bold; color: #58a6ff;'>➕ Click '+' to add filter fields dynamically!</div>", unsafe_allow_html=True)
+            # Blue color works fine on both light and dark mode, so keeping it
+            st.markdown("<div style='font-size: 18px; font-weight: bold; color: #1e88e5;'>➕ Click '+' to add filter fields dynamically!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=wp_reset_dashboard, key="wp_reset")
 
@@ -252,7 +248,7 @@ else:
                     chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"wp_val_{fid}")
                     if chosen_val != "(Select a Value)":
                         wp_active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
-                        wp_progressive_df = wp_progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+                        wp_progressive_df = wp_progressive_df[wp_progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
                 
                 with col3:
                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
@@ -263,8 +259,8 @@ else:
         st.markdown("---")
         
         st.subheader("💬 Or Ask AI (Custom Question):")
-        # Moved the instructional text to the placeholder so it's perfectly visible in all themes
-        st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
+        # FIXED: Removed specific color so it adapts automatically
+        st.markdown("<div style='font-size: 18px; margin-bottom: 10px;'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
         wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... e.g. SM contractor er progress ki?", key="wp_ai_query_input", label_visibility="collapsed")
 
@@ -426,7 +422,7 @@ else:
         st.subheader("🎯 Smart Dynamic Filters:")
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
-            st.markdown("<div style='font-size: 18px; font-weight: bold; color: #58a6ff;'>➕ Click '+' to add filter fields. Options will dynamically update based on your selections!</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size: 18px; font-weight: bold; color: #1e88e5;'>➕ Click '+' to add filter fields. Options will dynamically update based on your selections!</div>", unsafe_allow_html=True)
         with col_f_btn:
             st.button("🔄 Reset / Refresh", on_click=reset_dashboard, help="Clear all filters and search results")
 
@@ -454,7 +450,8 @@ else:
         st.markdown("---")
 
         st.subheader("💬 Or Ask AI (Custom Question):")
-        st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
+        # FIXED: Removed specific color so it adapts automatically
+        st.markdown("<div style='font-size: 18px; margin-bottom: 10px;'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
         user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="ai_query_input", label_visibility="collapsed")
 
