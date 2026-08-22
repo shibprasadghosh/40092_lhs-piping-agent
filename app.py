@@ -262,7 +262,7 @@ else:
         # FIXED: Removed specific color so it adapts automatically
         st.markdown("<div style='font-size: 18px; margin-bottom: 10px;'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
-        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... e.g. SM contractor er progress ki?", key="wp_ai_query_input", label_visibility="collapsed")
+        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... ", key="wp_ai_query_input", label_visibility="collapsed")
 
         if st.button("🚀 Calculate Progress & Search", type="primary"):
             if df.empty:
