@@ -88,9 +88,9 @@ div.element-container:has(#my-frozen-header) {{
     position: sticky;
     top: 2.875rem; 
     z-index: 999999;
-    background-color: var(--background-color); 
+    background-color: #0e1117; 
     padding-bottom: 15px;
-    border-bottom: 2px solid var(--secondary-background-color);
+    border-bottom: 2px solid #2c333f;
     margin-bottom: 15px;
 }}
 /* Custom Styling for Primary Buttons */
@@ -278,7 +278,8 @@ else:
         st.subheader("💬 Or Ask AI (Custom Question):")
         st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
-        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... e.g. SM contractor er progress ki?", key="wp_ai_query_input", label_visibility="collapsed")
+        # FIXED: Removed the contractor name example, kept it clean and neutral
+        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="wp_ai_query_input", label_visibility="collapsed")
 
         if st.button("🚀 Calculate Progress & Search", type="primary"):
             if df.empty:
@@ -404,7 +405,7 @@ else:
                     st.markdown(css_donut_html, unsafe_allow_html=True)
 
                 # ---------------------------------------------------------
-                # RT PROGRESS LOGIC (Advanced Algorithmic Logic)
+                # RT PROGRESS LOGIC
                 # ---------------------------------------------------------
                 else:
                     xr_col = next((c for c in chart_df.columns if 'XR NO' in c.upper() or 'RT NO' in c.upper()), None)
@@ -415,7 +416,6 @@ else:
                     final_res_col = next((c for c in chart_df.columns if 'FINAL RESULT' in c.upper()), None)
                     
                     if xr_col:
-                        # Step 1: Filter to only rows that have an XR NO. (This is the RT Scope)
                         rt_df = chart_df[chart_df[xr_col].apply(lambda x: is_valid_val(x))].copy()
                         
                         rt_total_joints = len(rt_df)
@@ -429,16 +429,12 @@ else:
                                 r2_res = str(row.get(r2_res_col, '')).strip().upper()
                                 r3_res = str(row.get(r3_res_col, '')).strip().upper()
                                 
-                                # 2. Accepted (ACC)
                                 if f_res == 'ACC':
                                     return 'ACC'
-                                # 3. Pending
                                 if not r1_rep or r1_rep in ['NAN', 'NONE', 'N/A']:
                                     return 'PENDING'
-                                # 4. Repair (REP)
                                 if 'REP' in r1_res or 'REP' in r2_res or 'REP' in r3_res:
                                     return 'REP'
-                                # 5. Other than REP (Minor Obs)
                                 return 'OTHER'
 
                             rt_df['RT_Status'] = rt_df.apply(determine_rt_status, axis=1)
@@ -460,13 +456,11 @@ else:
                             
                             acc_pct = int((acc_id / rt_total_id) * 100) if rt_total_id > 0 else 0
                             
-                            # Calculate degrees for a 4-part donut chart
                             deg_acc = (acc_id / rt_total_id) * 360 if rt_total_id > 0 else 0
                             deg_pending = (pending_id / rt_total_id) * 360 if rt_total_id > 0 else 0
                             deg_rep = (rep_id / rt_total_id) * 360 if rt_total_id > 0 else 0
                             deg_other = (other_id / rt_total_id) * 360 if rt_total_id > 0 else 0
                             
-                            # Conic Gradient logic (Green, Gray, Red, Orange)
                             grad = f"conic-gradient(#28a745 0deg {deg_acc}deg, #6c757d {deg_acc}deg {deg_acc + deg_pending}deg, #dc3545 {deg_acc + deg_pending}deg {deg_acc + deg_pending + deg_rep}deg, #fd7e14 {deg_acc + deg_pending + deg_rep}deg 360deg)"
                             
                             css_rt_donut_html = f"""
@@ -564,6 +558,7 @@ else:
         st.subheader("💬 Or Ask AI (Custom Question):")
         st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
+        # FIXED: Clean and neutral placeholder here too
         user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="ai_query_input", label_visibility="collapsed")
 
         if st.button("🔍 Search Database", type="primary"):
@@ -603,7 +598,7 @@ else:
                             1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
                             2. EXACT vs PARTIAL MATCHING: 
                                - For IDs/Numbers, use EXACT matching.
-                               - For Names, Contractors, Agencies, or text substrings (like 'PECO'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
+                               - For Names, Contractors, Agencies, or text substrings, you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                             3. Identify the most logical column name based on context.
                             
                             User requested: "{active_query}"
