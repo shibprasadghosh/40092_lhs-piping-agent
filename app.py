@@ -409,10 +409,14 @@ else:
                     st.markdown(css_donut_html, unsafe_allow_html=True)
 
                 # ---------------------------------------------------------
-                # RT PROGRESS LOGIC (FINAL RESULT IGNORED ENTIRELY)
+                # RT PROGRESS LOGIC (BULLETPROOF BUG FIX)
                 # ---------------------------------------------------------
                 else:
-                    xr_col = next((c for c in chart_df.columns if 'XR NO' in c.upper() or 'RT NO' in c.upper()), None)
+                    # THE FIX: Strictly looking for EXACT 'XR NO.', 'XR NO', 'RT NO.', 'RT NO' 
+                    # This prevents matching "RT NO" inside "F&W REPORT NO."
+                    valid_xr_names = ['XR NO', 'XR NO.', 'RT NO', 'RT NO.']
+                    xr_col = next((c for c in chart_df.columns if c.strip().upper() in valid_xr_names or c.strip().upper().startswith('XR NO')), None)
+                    
                     r1_rep_col = next((c for c in chart_df.columns if 'R1 REPORT NO' in c.upper()), None)
                     r1_res_col = next((c for c in chart_df.columns if 'R1-RESULT' in c.upper() or 'R1 RESULT' in c.upper()), None)
                     r2_res_col = next((c for c in chart_df.columns if 'R2-RESULT' in c.upper() or 'R2 RESULT' in c.upper()), None)
