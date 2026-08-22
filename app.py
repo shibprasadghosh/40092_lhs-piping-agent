@@ -421,7 +421,7 @@ else:
                     final_res_col = next((c for c in chart_df.columns if 'FINAL RESULT' in c.upper()), None)
                     
                     if xr_col:
-                        # STRICT LOGIC: Only rows with a valid XR NO (>= 2 chars) are considered in RT Scope
+                        # SUPER STRICT LOGIC: This applies to EVERYTHING (Dropdowns & AI)
                         rt_df = chart_df[chart_df[xr_col].apply(lambda x: is_strict_valid_xr(x))].copy()
                         
                         rt_total_joints = len(rt_df)
