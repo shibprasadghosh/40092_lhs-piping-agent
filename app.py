@@ -88,9 +88,9 @@ div.element-container:has(#my-frozen-header) {{
     position: sticky;
     top: 2.875rem; 
     z-index: 999999;
-    background-color: #0e1117; 
+    background-color: var(--background-color); 
     padding-bottom: 15px;
-    border-bottom: 2px solid #2c333f;
+    border-bottom: 2px solid var(--secondary-background-color);
     margin-bottom: 15px;
 }}
 /* Custom Styling for Primary Buttons */
@@ -107,6 +107,11 @@ button[kind="primary"]:hover {{
     background: linear-gradient(135deg, #2a5298, #1e3c72) !important;
     border: 1px solid #00d2ff !important;
     box-shadow: 0 4px 8px rgba(0, 210, 255, 0.3) !important;
+}}
+/* Fix for light mode headers to use default text color */
+.theme-adaptive-text {{
+    font-size: 18px; 
+    margin-bottom: 15px;
 }}
 </style>
 """
@@ -225,7 +230,8 @@ else:
                 st.session_state.wp_ai_query_input = "" 
 
         st.subheader("📊 Welding Progress & Analytics")
-        st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 15px;'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
+        # Removed hardcoded white color, let Streamlit handle light/dark mode text color
+        st.markdown("<div class='theme-adaptive-text'>Use smart filters or Ask AI to generate a precise visual progress chart based on <b>Inch Dia (ID)</b>.</div>", unsafe_allow_html=True)
 
         col_f_title, col_f_btn = st.columns([4, 1])
         with col_f_title:
@@ -246,7 +252,7 @@ else:
                     chosen_val = col2.selectbox(f"Value for {chosen_col}", unique_vals, key=f"wp_val_{fid}")
                     if chosen_val != "(Select a Value)":
                         wp_active_conditions.append(f"`{chosen_col}` == '{chosen_val}'")
-                        wp_progressive_df = wp_progressive_df[wp_progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
+                        wp_progressive_df = wp_progressive_df[progressive_df[chosen_col].astype(str).str.strip() == chosen_val]
                 
                 with col3:
                     st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
@@ -255,10 +261,12 @@ else:
         st.button("➕ Add Another Filter Field", on_click=wp_add_filter_row, key="wp_add")
 
         st.markdown("---")
-        st.markdown("<h3 style='margin-bottom: 5px; color: #ffffff;'>💬 Or Ask AI (Custom Question):</h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 10px;'>Enter your question here in your preferred language <b>(Leave blank if using filters above)</b>:</div>", unsafe_allow_html=True)
         
-        wp_user_query = st.text_input("Hidden Label", key="wp_ai_query_input", label_visibility="collapsed")
+        st.subheader("💬 Or Ask AI (Custom Question):")
+        # Moved the instructional text to the placeholder so it's perfectly visible in all themes
+        st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
+        
+        wp_user_query = st.text_input("Hidden Label", placeholder="Type your custom question here... e.g. SM contractor er progress ki?", key="wp_ai_query_input", label_visibility="collapsed")
 
         if st.button("🚀 Calculate Progress & Search", type="primary"):
             if df.empty:
@@ -299,7 +307,7 @@ else:
                                 1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1.
                                 2. EXACT vs PARTIAL MATCHING: 
                                    - For IDs/Numbers, use EXACT matching.
-                                   - For Names, Contractors, Agencies, or text substrings (like 'PECO'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
+                                   - For Names, Contractors, Agencies, or text substrings (like 'PECO', 'SM'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                                 
                                 User requested: "{active_query}"
                                 
@@ -327,7 +335,7 @@ else:
                                 else:
                                     st.session_state.wp_search_result_df = None
                                     st.session_state.wp_success_msg = ""
-                                    st.error("❌ No matching data found or API error.")
+                                    st.warning("⚠️ System is currently processing high-volume data requests. Please wait a moment or refresh to try again.")
                 else:
                     st.warning("Please enter a question or select at least one filter first to calculate progress!")
 
@@ -444,10 +452,11 @@ else:
         st.button("➕ Add Another Filter Field", on_click=add_filter_row)
 
         st.markdown("---")
-        st.markdown("<h3 style='margin-bottom: 5px; color: #ffffff;'>💬 Or Ask AI (Custom Question):</h3>", unsafe_allow_html=True)
-        st.markdown("<div style='font-size: 18px; color: #e0e0e0; margin-bottom: 10px;'>Enter your question here in your preferred language <b>(Leave blank if using filters above)</b>:</div>", unsafe_allow_html=True)
+
+        st.subheader("💬 Or Ask AI (Custom Question):")
+        st.markdown("<div class='theme-adaptive-text'><b>Instructions:</b> Enter your question below in your preferred language. Leave it blank if you have already selected filters above.</div>", unsafe_allow_html=True)
         
-        user_query = st.text_input("Hidden Label", key="ai_query_input", label_visibility="collapsed")
+        user_query = st.text_input("Hidden Label", placeholder="Type your custom question here...", key="ai_query_input", label_visibility="collapsed")
 
         if st.button("🔍 Search Database", type="primary"):
             if df.empty:
@@ -460,7 +469,9 @@ else:
                 if active_conditions:
                     auto_query = "Find all rows where " + " and ".join(active_conditions) + ". Show all columns."
                     if active_query:
-                        active_query = auto_query + " Furthermore, apply this condition: " + active_query if active_query else auto_query
+                        active_query = auto_query + " Furthermore, apply this condition: " + active_query
+                    else:
+                        active_query = auto_query
 
                 if active_query:
                     if not model_list:
@@ -472,7 +483,6 @@ else:
                             final_res = None
                             successful_model = ""
                             
-                            # Fallback logic restored: Pro first, then Flash
                             smart_models = [m for m in model_list if 'pro' in m.lower()] + [m for m in model_list if 'flash' in m.lower()]
                             smart_models = list(dict.fromkeys(smart_models))
                             ordered_models = smart_models
@@ -484,7 +494,7 @@ else:
                             CRITICAL RULES FOR SEARCHING:
                             1. Output formatting: Add a new column named 'Sl. No.' with dynamic serial numbers starting from 1. Do NOT include original dataframe index.
                             2. EXACT vs PARTIAL MATCHING: 
-                               - For IDs/Numbers (like Line No, Joint No, Area), use EXACT matching: `df[df['column_name'].astype(str).str.strip().str.upper() == 'VAL']`
+                               - For IDs/Numbers, use EXACT matching.
                                - For Names, Contractors, Agencies, or text substrings (like 'PECO'), you MUST use `.str.contains('VAL', case=False, na=False)` to allow partial text matches!
                             3. Identify the most logical column name based on context.
                             
@@ -514,7 +524,7 @@ else:
                             else:
                                 st.session_state.search_result_df = None
                                 st.session_state.success_msg = ""
-                                st.warning("⚠️ System is currently processing high-volume data requests. Please wait a moment or refresh to sync again.")
+                                st.warning("⚠️ System is currently processing high-volume data requests. Please wait a moment or refresh to try again.")
                 else:
                     st.warning("Please enter a question or select at least one filter first!")
 
