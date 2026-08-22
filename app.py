@@ -216,7 +216,7 @@ else:
         return pd.notna(val) and str_val not in ['', 'NAN', 'NONE', 'N/A'] and len(str_val) >= 2
 
     # ==========================================
-    # --- MENU 1: WELDING & RT PROGRESS ---
+    # --- MENU 1: WELDING & RT Progress ---
     # ==========================================
     if menu_selection == "📊 Welding & RT Progress":
         if 'wp_filter_ids' not in st.session_state:
@@ -409,18 +409,17 @@ else:
                     st.markdown(css_donut_html, unsafe_allow_html=True)
 
                 # ---------------------------------------------------------
-                # RT PROGRESS LOGIC (BULLETPROOF BUG FIX)
+                # RT PROGRESS LOGIC (BULLETPROOF FLEXIBLE MATCHING)
                 # ---------------------------------------------------------
                 else:
-                    # THE FIX: Strictly looking for EXACT 'XR NO.', 'XR NO', 'RT NO.', 'RT NO' 
-                    # This prevents matching "RT NO" inside "F&W REPORT NO."
                     valid_xr_names = ['XR NO', 'XR NO.', 'RT NO', 'RT NO.']
                     xr_col = next((c for c in chart_df.columns if c.strip().upper() in valid_xr_names or c.strip().upper().startswith('XR NO')), None)
                     
-                    r1_rep_col = next((c for c in chart_df.columns if 'R1 REPORT NO' in c.upper()), None)
-                    r1_res_col = next((c for c in chart_df.columns if 'R1-RESULT' in c.upper() or 'R1 RESULT' in c.upper()), None)
-                    r2_res_col = next((c for c in chart_df.columns if 'R2-RESULT' in c.upper() or 'R2 RESULT' in c.upper()), None)
-                    r3_res_col = next((c for c in chart_df.columns if 'R3-RESULT' in c.upper() or 'R3 RESULT' in c.upper()), None)
+                    # FLEXIBLE MATCHING: Finds columns even if there are extra spaces like "R2- RESULT"
+                    r1_rep_col = next((c for c in chart_df.columns if 'R1' in c.upper() and 'REPORT' in c.upper()), None)
+                    r1_res_col = next((c for c in chart_df.columns if 'R1' in c.upper() and 'RESULT' in c.upper()), None)
+                    r2_res_col = next((c for c in chart_df.columns if 'R2' in c.upper() and 'RESULT' in c.upper()), None)
+                    r3_res_col = next((c for c in chart_df.columns if 'R3' in c.upper() and 'RESULT' in c.upper()), None)
                     
                     if xr_col:
                         # STRICT LOGIC: Only rows with a valid XR NO (>= 2 chars) are considered in RT Scope
